@@ -1,0 +1,20 @@
+# Remote server for push/pull (rsync target)
+remote = "user@host:~/.vibe-usage"
+
+# Tools billed by subscription (flat monthly rate) instead of per-token.
+# API equivalent cost is still calculated for comparison.
+
+[[subscriptions]]
+tool = "claude"
+plan = "Team"
+monthly_usd = 30.0
+
+[[subscriptions]]
+tool = "codex"
+plan = "Plus"
+monthly_usd = 20.0
+
+[[subscriptions]]
+tool = "gemini"
+plan = "Pro"
+monthly_usd = 30.0
