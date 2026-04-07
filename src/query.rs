@@ -4,7 +4,7 @@ use std::time::Instant;
 use serde::Deserialize;
 use tokio::sync::RwLock;
 
-use crate::collector::{raw_dirs_for, Collector};
+use crate::collector::{Collector, raw_dirs_for};
 use crate::pricing::PricingProvider;
 use crate::schema::Session;
 

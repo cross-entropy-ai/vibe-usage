@@ -3,8 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import type { WeekdayHeatmapEntry } from "@/types";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const CELL = 28;
-const GAP = 3;
+const CELL = 22;
+const GAP = 2;
 
 const LEVELS = [
   "bg-muted",
@@ -58,7 +58,7 @@ export function WeekdayHeatmap({ data }: { data: WeekdayHeatmapEntry[] }) {
           {DAYS.map((day, di) => (
             <div key={day} className="flex items-center" style={{ height: CELL + GAP }}>
               <span className="text-xs text-muted-foreground w-10 text-right pr-2">{day}</span>
-              <div className="flex gap-[3px]">
+              <div className="flex" style={{ gap: GAP }}>
                 {Array.from({ length: 24 }, (_, h) => {
                   const count = grid[di][h];
                   const level = getLevel(count, max);

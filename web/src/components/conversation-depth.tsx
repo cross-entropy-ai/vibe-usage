@@ -1,4 +1,5 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
+import { useMemo } from "react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChartContainer,
@@ -10,8 +11,24 @@ import { fmtNum } from "@/lib/formatters";
 import type { ConversationsInsight } from "@/types";
 
 const depthConfig = { count: { label: "Sessions", color: "var(--chart-1)" } } satisfies ChartConfig;
+const lengthConfig = {
+  prompt: { label: "Prompt", color: "var(--chart-1)" },
+  response: { label: "Response", color: "var(--chart-3)" },
+} satisfies ChartConfig;
 
 export function ConversationDepth({ data }: { data: ConversationsInsight }) {
+  const lengthHistogram = useMemo(() => {
+    const responseByBucket = new Map(
+      data.response_length.histogram.map((entry) => [entry.bucket, entry.count]),
+    );
+
+    return data.prompt_length.histogram.map((entry) => ({
+      bucket: entry.bucket,
+      prompt: entry.count,
+      response: responseByBucket.get(entry.bucket) ?? 0,
+    }));
+  }, [data.prompt_length.histogram, data.response_length.histogram]);
+
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <Card>
@@ -26,7 +43,7 @@ export function ConversationDepth({ data }: { data: ConversationsInsight }) {
             <BarChart data={data.depth.histogram} accessibilityLayer>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="bucket" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-              <YAxis scale="log" domain={[1, "auto"]} tickLine={false} axisLine={false} />
+              <YAxis tickLine={false} axisLine={false} />
               <ChartTooltip content={<ChartTooltipContent />} />
               <Bar dataKey="count" fill="var(--color-count)" radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -35,22 +52,25 @@ export function ConversationDepth({ data }: { data: ConversationsInsight }) {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Message Lengths</CardTitle>
-          <CardDescription>Average character count per message</CardDescription>
+          <CardTitle className="text-base">Message Length Distribution</CardTitle>
+          <CardDescription>
+            Prompt avg {fmtNum(data.prompt_length.avg_chars)} / median {fmtNum(data.prompt_length.median_chars)}
+            {" · "}
+            Response avg {fmtNum(data.response_length.avg_chars)} / median {fmtNum(data.response_length.median_chars)}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4 py-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold">{fmtNum(data.prompt_length.avg_chars)}</div>
-              <div className="text-xs text-muted-foreground">avg prompt (chars)</div>
-              <div className="text-sm text-muted-foreground mt-1">median: {fmtNum(data.prompt_length.median_chars)}</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold">{fmtNum(data.response_length.avg_chars)}</div>
-              <div className="text-xs text-muted-foreground">avg response (chars)</div>
-              <div className="text-sm text-muted-foreground mt-1">median: {fmtNum(data.response_length.median_chars)}</div>
-            </div>
-          </div>
+          <ChartContainer config={lengthConfig} className="h-[200px] w-full">
+            <BarChart data={lengthHistogram} accessibilityLayer>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="bucket" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+              <YAxis tickLine={false} axisLine={false} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Legend />
+              <Bar dataKey="prompt" fill="var(--color-prompt)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="response" fill="var(--color-response)" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ChartContainer>
         </CardContent>
       </Card>
     </div>

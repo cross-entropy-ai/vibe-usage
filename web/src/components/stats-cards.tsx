@@ -1,76 +1,73 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Activity, Bot, FolderKanban, MessageSquareText } from "lucide-react";
-import { toolColor, sortedToolEntries } from "@/lib/utils";
+import { Activity, Bot, CalendarRange, MessageSquareText } from "lucide-react";
 import { fmtNum } from "@/lib/formatters";
-import { toolLabel } from "@/lib/tools";
 import type { Summary } from "@/types";
 
 export function StatsCards({ summary }: { summary: Summary }) {
-  const totalTokens = summary.tokens.input + summary.tokens.output + summary.tokens.thinking;
+  const totalSessions = summary.daily.reduce((sum, entry) => sum + entry.sessions, 0);
+  const totalMessages = summary.daily.reduce((sum, entry) => sum + entry.messages, 0);
+  const inputTokens = summary.daily.reduce((sum, entry) => sum + entry.input_tokens, 0);
+  const outputTokens = summary.daily.reduce((sum, entry) => sum + entry.output_tokens, 0);
+  const totalTokens = inputTokens + outputTokens;
   const activeDays = summary.daily.length;
-  const topProject = summary.top_projects[0];
+  const messagesPerSession = totalSessions > 0 ? totalMessages / totalSessions : null;
+  const tokenOutputShare = totalTokens > 0 ? (outputTokens / totalTokens) * 100 : null;
+  const periodLabel =
+    summary.period.start && summary.period.end
+      ? `${summary.period.start} to ${summary.period.end}`
+      : "No reporting period";
   const cards = [
     {
       title: "Sessions Processed",
-      value: fmtNum(summary.total_sessions),
+      value: fmtNum(totalSessions),
       description:
         activeDays > 0
           ? `${activeDays} active days with ${(
-              summary.total_sessions / activeDays
+              totalSessions / activeDays
             ).toFixed(1)} sessions per day`
           : "No active-day coverage yet",
       icon: Activity,
-      footer: (
-        <div className="flex gap-1 flex-wrap">
-          {sortedToolEntries(summary.by_tool).map(([tool, count]) =>
-            count > 0 ? (
-              <Badge key={tool} variant="secondary" className={toolColor(tool)}>
-                {toolLabel(tool)} {count}
-              </Badge>
-            ) : null,
-          )}
-        </div>
-      ),
+      footer: <p className="text-xs text-muted-foreground">{periodLabel}</p>,
     },
     {
       title: "Message Exchange",
-      value: fmtNum(summary.messages.total),
-      description: `${fmtNum(summary.messages.user)} user / ${fmtNum(summary.messages.assistant)} assistant`,
+      value: fmtNum(totalMessages),
+      description:
+        messagesPerSession !== null
+          ? `${messagesPerSession.toFixed(1)} messages per session`
+          : "No session baseline",
       icon: MessageSquareText,
       footer: (
         <p className="text-xs text-muted-foreground">
-          {summary.messages.user > 0
-            ? `${(summary.messages.assistant / summary.messages.user).toFixed(1)} assistant replies per user message`
-            : "No user-message baseline"}
+          {activeDays > 0
+            ? `${activeDays} active days in the selected window`
+            : "No activity in this window"}
         </p>
       ),
     },
     {
       title: "Token Volume",
       value: fmtNum(totalTokens),
-      description: `${fmtNum(summary.tokens.input)} input / ${fmtNum(summary.tokens.output)} output`,
+      description: `${fmtNum(inputTokens)} input / ${fmtNum(outputTokens)} output`,
       icon: Bot,
       footer: (
         <p className="text-xs text-muted-foreground">
-          {summary.tokens.thinking > 0
-            ? `${fmtNum(summary.tokens.thinking)} thinking tokens captured`
-            : "No thinking-token telemetry"}
+          {totalSessions > 0
+            ? `${fmtNum(totalTokens / totalSessions)} tokens per session`
+            : "No session baseline"}
         </p>
       ),
     },
     {
-      title: "Primary Workspace",
-      value: topProject?.name ?? "No project data",
-      description: topProject
-        ? `${fmtNum(topProject.sessions)} sessions routed through the busiest project`
-        : "Project breakdown unavailable",
-      icon: FolderKanban,
+      title: "Window Coverage",
+      value: fmtNum(activeDays),
+      description: periodLabel,
+      icon: CalendarRange,
       footer: (
         <p className="text-xs text-muted-foreground">
-          {summary.period.start && summary.period.end
-            ? `${summary.period.start} to ${summary.period.end}`
-            : "No reporting period"}
+          {tokenOutputShare !== null
+            ? `${tokenOutputShare.toFixed(1)}% output share`
+            : "No token coverage yet"}
         </p>
       ),
     },

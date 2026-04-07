@@ -102,7 +102,14 @@ pub fn daily_tokens(sessions: &[Session]) -> Vec<DailyTokensByTool> {
             let by_tool: HashMap<String, TokenBreakdown> = tools
                 .into_iter()
                 .map(|(tool, (inp, out, think))| {
-                    (tool, TokenBreakdown { input: inp, output: out, thinking: think })
+                    (
+                        tool,
+                        TokenBreakdown {
+                            input: inp,
+                            output: out,
+                            thinking: think,
+                        },
+                    )
                 })
                 .collect();
             DailyTokensByTool { date, by_tool }

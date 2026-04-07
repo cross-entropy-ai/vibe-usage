@@ -12,10 +12,13 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-use collector::{build_collectors, default_data_dir, raw_dirs_for, sync_collector, Collector};
+use collector::{Collector, build_collectors, default_data_dir, raw_dirs_for, sync_collector};
 
 #[derive(Parser)]
-#[command(name = "vibe-usage", about = "Collect AI coding tool usage into a unified format")]
+#[command(
+    name = "vibe-usage",
+    about = "Collect AI coding tool usage into a unified format"
+)]
 struct Cli {
     /// Which tools to operate on (gemini, claude, codex, kimi). Omit for all.
     #[arg(short, long, value_delimiter = ',', global = true)]
@@ -102,7 +105,10 @@ fn do_sync(collectors: &[Box<dyn Collector + Send + Sync>], data_dir: &PathBuf) 
     Ok(())
 }
 
-fn do_parse(collectors: &[Box<dyn Collector + Send + Sync>], data_dir: &PathBuf) -> Result<Vec<schema::Session>> {
+fn do_parse(
+    collectors: &[Box<dyn Collector + Send + Sync>],
+    data_dir: &PathBuf,
+) -> Result<Vec<schema::Session>> {
     let mut all_sessions = Vec::new();
     for c in collectors {
         let dirs = raw_dirs_for(c.as_ref(), data_dir);
@@ -146,13 +152,23 @@ fn print_summary(sessions: &[schema::Session]) {
     let tool_str = {
         let mut parts: Vec<_> = stats.by_tool.iter().collect();
         parts.sort_by_key(|(k, _)| k.as_str());
-        parts.iter().map(|(name, count)| format!("{name}: {count}")).collect::<Vec<_>>().join(", ")
+        parts
+            .iter()
+            .map(|(name, count)| format!("{name}: {count}"))
+            .collect::<Vec<_>>()
+            .join(", ")
     };
 
     println!("=== Usage Summary ===");
     println!("Sessions:  {} ({tool_str})", stats.total_sessions);
-    println!("Messages:  {} (user: {}, assistant: {})", stats.messages.total, stats.messages.user, stats.messages.assistant);
-    println!("Tokens:    input: {}, output: {}", stats.tokens.input, stats.tokens.output);
+    println!(
+        "Messages:  {} (user: {}, assistant: {})",
+        stats.messages.total, stats.messages.user, stats.messages.assistant
+    );
+    println!(
+        "Tokens:    input: {}, output: {}",
+        stats.tokens.input, stats.tokens.output
+    );
 
     if let (Some(start), Some(end)) = (&stats.period.start, &stats.period.end) {
         println!("Period:    {start} — {end}");

@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::process::Command;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 
 use crate::collector::hostname;
@@ -14,8 +14,12 @@ struct Config {
 /// Read remote address from `<data_dir>/config.toml`.
 fn load_config(data_dir: &Path) -> Result<Config> {
     let path = data_dir.join("config.toml");
-    let text = std::fs::read_to_string(&path)
-        .with_context(|| format!("missing config: {}\nCreate it with:\n  remote = \"user@host:~/.vibe-usage\"", path.display()))?;
+    let text = std::fs::read_to_string(&path).with_context(|| {
+        format!(
+            "missing config: {}\nCreate it with:\n  remote = \"user@host:~/.vibe-usage\"",
+            path.display()
+        )
+    })?;
 
     let config: Config = toml::from_str(&text).context("parse config.toml")?;
     Ok(config)
@@ -43,7 +47,14 @@ pub fn push(data_dir: &Path) -> Result<()> {
     let rsync_path = format!("mkdir -p {} && rsync", remote_path);
 
     let status = Command::new("rsync")
-        .args(["-az", "--progress", "--rsync-path", &rsync_path, &src, &dest])
+        .args([
+            "-az",
+            "--progress",
+            "--rsync-path",
+            &rsync_path,
+            &src,
+            &dest,
+        ])
         .status()
         .context("failed to run rsync")?;
 

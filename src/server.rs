@@ -1,17 +1,17 @@
 use std::sync::Arc;
 
 use axum::{
+    Router,
     extract::{Query, State},
-    http::{header, StatusCode, Uri},
+    http::{StatusCode, Uri, header},
     response::{IntoResponse, Json, Response},
     routing::get,
-    Router,
 };
 use rust_embed::Embed;
 use tower_http::cors::CorsLayer;
 
 use crate::analytics;
-use crate::query::{collect_sessions, filter_sessions, paginate, AppState, SessionFilter};
+use crate::query::{AppState, SessionFilter, collect_sessions, filter_sessions, paginate};
 
 #[derive(Embed)]
 #[folder = "web/dist"]
@@ -74,7 +74,9 @@ async fn api_activity_heatmap(State(state): State<Arc<AppState>>) -> Json<serde_
 
 async fn api_cost(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     let sessions = collect_sessions(&state).await;
-    Json(serde_json::to_value(analytics::cost_breakdown(&sessions, state.pricing.as_ref())).unwrap())
+    Json(
+        serde_json::to_value(analytics::cost_breakdown(&sessions, state.pricing.as_ref())).unwrap(),
+    )
 }
 
 async fn api_messages_latency(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
@@ -103,10 +105,20 @@ async fn static_handler(uri: Uri) -> Response {
     match Asset::get(path) {
         Some(content) => {
             let mime = mime_guess::from_path(path).first_or_octet_stream();
-            (StatusCode::OK, [(header::CONTENT_TYPE, mime.as_ref().to_string())], content.data.to_vec()).into_response()
+            (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, mime.as_ref().to_string())],
+                content.data.to_vec(),
+            )
+                .into_response()
         }
         None => match Asset::get("index.html") {
-            Some(content) => (StatusCode::OK, [(header::CONTENT_TYPE, "text/html".to_string())], content.data.to_vec()).into_response(),
+            Some(content) => (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, "text/html".to_string())],
+                content.data.to_vec(),
+            )
+                .into_response(),
             None => (StatusCode::NOT_FOUND, "Not found").into_response(),
         },
     }

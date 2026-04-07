@@ -4,7 +4,7 @@ use serde::Serialize;
 
 use crate::schema::{Role, Session};
 
-use super::{avg, median, BucketCount};
+use super::{BucketCount, avg, median};
 
 // ── Private helpers ────────────────────────────────────────────────
 
@@ -18,16 +18,54 @@ fn is_cjk(c: char) -> bool {
 
 fn classify_task(text: &str) -> &'static str {
     let rules: &[(&[&str], &str)] = &[
-        (&["fix", "bug", "error", "issue", "broken", "wrong", "fail", "crash"], "Bug Fix"),
-        (&["refactor", "clean", "simplify", "reorganize", "restructure"], "Refactor"),
+        (
+            &[
+                "fix", "bug", "error", "issue", "broken", "wrong", "fail", "crash",
+            ],
+            "Bug Fix",
+        ),
+        (
+            &["refactor", "clean", "simplify", "reorganize", "restructure"],
+            "Refactor",
+        ),
         (&["test", "spec", "assert", "coverage"], "Testing"),
-        (&["explain", "what is", "how does", "why", "understand", "tell me"], "Explanation"),
+        (
+            &[
+                "explain",
+                "what is",
+                "how does",
+                "why",
+                "understand",
+                "tell me",
+            ],
+            "Explanation",
+        ),
         (&["review", "check", "look at", "audit"], "Code Review"),
-        (&["add", "implement", "create", "build", "make", "write", "new feature"], "New Feature"),
-        (&["update", "change", "modify", "adjust", "tweak"], "Modification"),
+        (
+            &[
+                "add",
+                "implement",
+                "create",
+                "build",
+                "make",
+                "write",
+                "new feature",
+            ],
+            "New Feature",
+        ),
+        (
+            &["update", "change", "modify", "adjust", "tweak"],
+            "Modification",
+        ),
         (&["deploy", "release", "publish", "ship"], "Deployment"),
-        (&["config", "setup", "install", "init", "configure"], "Configuration"),
-        (&["read", "show", "list", "find", "search", "look up", "fetch"], "Exploration"),
+        (
+            &["config", "setup", "install", "init", "configure"],
+            "Configuration",
+        ),
+        (
+            &["read", "show", "list", "find", "search", "look up", "fetch"],
+            "Exploration",
+        ),
         (&["修", "改", "错", "问题"], "Bug Fix"),
         (&["重构", "优化", "清理"], "Refactor"),
         (&["测试"], "Testing"),
@@ -63,10 +101,32 @@ fn extract_extensions(args: &serde_json::Value) -> Vec<String> {
                     let e = ext.to_string_lossy().to_lowercase();
                     if matches!(
                         e.as_str(),
-                        "rs" | "py" | "js" | "ts" | "tsx" | "jsx" | "go" | "java"
-                            | "rb" | "c" | "cpp" | "h" | "hpp" | "css" | "html"
-                            | "json" | "yaml" | "yml" | "toml" | "md" | "sh"
-                            | "sql" | "proto" | "swift" | "kt" | "vue" | "svelte"
+                        "rs" | "py"
+                            | "js"
+                            | "ts"
+                            | "tsx"
+                            | "jsx"
+                            | "go"
+                            | "java"
+                            | "rb"
+                            | "c"
+                            | "cpp"
+                            | "h"
+                            | "hpp"
+                            | "css"
+                            | "html"
+                            | "json"
+                            | "yaml"
+                            | "yml"
+                            | "toml"
+                            | "md"
+                            | "sh"
+                            | "sql"
+                            | "proto"
+                            | "swift"
+                            | "kt"
+                            | "vue"
+                            | "svelte"
                     ) {
                         exts.push(e);
                     }
@@ -99,6 +159,7 @@ pub struct LengthStats {
     pub avg_chars: u64,
     pub median_chars: u64,
     pub total: usize,
+    pub histogram: Vec<BucketCount>,
 }
 
 #[derive(Debug, Serialize)]
@@ -215,6 +276,28 @@ pub fn conversation_insights(sessions: &[Session]) -> ConversationInsights {
         .collect();
     response_lens.sort();
 
+    let length_buckets = [
+        ("0-100", 0, 101),
+        ("101-300", 101, 301),
+        ("301-600", 301, 601),
+        ("601-1k", 601, 1001),
+        ("1k-2k", 1001, 2001),
+        ("2k-4k", 2001, 4001),
+        ("4k+", 4001, usize::MAX),
+    ];
+    let build_length_histogram = |lengths: &[usize]| -> Vec<BucketCount> {
+        length_buckets
+            .iter()
+            .map(|(label, lo, hi)| BucketCount {
+                bucket: label,
+                count: lengths
+                    .iter()
+                    .filter(|len| **len >= *lo && **len < *hi)
+                    .count(),
+            })
+            .collect()
+    };
+
     ConversationInsights {
         depth: DepthStats {
             histogram: depth_histogram,
@@ -226,11 +309,13 @@ pub fn conversation_insights(sessions: &[Session]) -> ConversationInsights {
             avg_chars: avg(&prompt_lens) as u64,
             median_chars: median(&prompt_lens) as u64,
             total: prompt_lens.len(),
+            histogram: build_length_histogram(&prompt_lens),
         },
         response_length: LengthStats {
             avg_chars: avg(&response_lens) as u64,
             median_chars: median(&response_lens) as u64,
             total: response_lens.len(),
+            histogram: build_length_histogram(&response_lens),
         },
     }
 }

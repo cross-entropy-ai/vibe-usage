@@ -62,8 +62,15 @@ pub fn cost_breakdown(sessions: &[Session], pricing: &dyn PricingProvider) -> Co
     for s in sessions {
         let tool = s.tool.to_string();
         for m in &s.messages {
-            let model = m.model.as_deref().or(s.model.as_deref()).unwrap_or("unknown").to_string();
-            let entry = by_model_map.entry(model).or_insert_with(|| (0, 0, 0, 0, 0, tool.clone()));
+            let model = m
+                .model
+                .as_deref()
+                .or(s.model.as_deref())
+                .unwrap_or("unknown")
+                .to_string();
+            let entry = by_model_map
+                .entry(model)
+                .or_insert_with(|| (0, 0, 0, 0, 0, tool.clone()));
             if let Some(t) = &m.tokens {
                 entry.0 += t.input.unwrap_or(0);
                 entry.1 += t.output.unwrap_or(0);
@@ -77,7 +84,8 @@ pub fn cost_breakdown(sessions: &[Session], pricing: &dyn PricingProvider) -> Co
     let mut total_equiv = 0.0f64;
     let mut model_costs: Vec<ModelCost> = Vec::new();
     for (model, (inp, out, think, cr, cw, tool)) in &by_model_map {
-        let equiv = pricing.price_for(model)
+        let equiv = pricing
+            .price_for(model)
             .map(|p| pricing::calculate_cost(&p, *inp, *out, *think, *cr, *cw))
             .unwrap_or(0.0);
         total_equiv += equiv;
@@ -104,17 +112,24 @@ pub fn cost_breakdown(sessions: &[Session], pricing: &dyn PricingProvider) -> Co
     for s in sessions {
         let tool = s.tool.to_string();
         for m in &s.messages {
-            let model = m.model.as_deref().or(s.model.as_deref()).unwrap_or("unknown");
+            let model = m
+                .model
+                .as_deref()
+                .or(s.model.as_deref())
+                .unwrap_or("unknown");
             if let Some(t) = &m.tokens {
-                let cost = pricing.price_for(model)
-                    .map(|p| pricing::calculate_cost(
-                        &p,
-                        t.input.unwrap_or(0),
-                        t.output.unwrap_or(0),
-                        t.thinking.unwrap_or(0),
-                        t.cache_read.unwrap_or(0),
-                        t.cache_write.unwrap_or(0),
-                    ))
+                let cost = pricing
+                    .price_for(model)
+                    .map(|p| {
+                        pricing::calculate_cost(
+                            &p,
+                            t.input.unwrap_or(0),
+                            t.output.unwrap_or(0),
+                            t.thinking.unwrap_or(0),
+                            t.cache_read.unwrap_or(0),
+                            t.cache_write.unwrap_or(0),
+                        )
+                    })
                     .unwrap_or(0.0);
                 *tool_equiv.entry(tool.clone()).or_default() += cost;
             }
@@ -127,7 +142,9 @@ pub fn cost_breakdown(sessions: &[Session], pricing: &dyn PricingProvider) -> Co
     for s in sessions {
         let tool = s.tool.to_string();
         let day = s.start_time.format("%Y-%m-%d").to_string();
-        tool_first.entry(tool.clone()).or_insert_with(|| day.clone());
+        tool_first
+            .entry(tool.clone())
+            .or_insert_with(|| day.clone());
         tool_last.insert(tool.clone(), day);
         tool_equiv.entry(tool).or_insert(0.0);
     }
@@ -175,17 +192,24 @@ pub fn cost_breakdown(sessions: &[Session], pricing: &dyn PricingProvider) -> Co
     for s in sessions {
         let day = s.start_time.format("%Y-%m-%d").to_string();
         for m in &s.messages {
-            let model = m.model.as_deref().or(s.model.as_deref()).unwrap_or("unknown");
+            let model = m
+                .model
+                .as_deref()
+                .or(s.model.as_deref())
+                .unwrap_or("unknown");
             if let Some(t) = &m.tokens {
-                let cost = pricing.price_for(model)
-                    .map(|p| pricing::calculate_cost(
-                        &p,
-                        t.input.unwrap_or(0),
-                        t.output.unwrap_or(0),
-                        t.thinking.unwrap_or(0),
-                        t.cache_read.unwrap_or(0),
-                        t.cache_write.unwrap_or(0),
-                    ))
+                let cost = pricing
+                    .price_for(model)
+                    .map(|p| {
+                        pricing::calculate_cost(
+                            &p,
+                            t.input.unwrap_or(0),
+                            t.output.unwrap_or(0),
+                            t.thinking.unwrap_or(0),
+                            t.cache_read.unwrap_or(0),
+                            t.cache_write.unwrap_or(0),
+                        )
+                    })
                     .unwrap_or(0.0);
                 *daily_map.entry(day.clone()).or_default() += cost;
             }

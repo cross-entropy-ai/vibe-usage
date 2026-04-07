@@ -43,10 +43,7 @@ pub fn hostname() -> String {
 /// `data_dir/raw/<hostname>/<name>/`.
 /// Only copies files whose source mtime is newer than the destination (or missing).
 pub fn sync_collector(collector: &dyn Collector, data_dir: &Path) -> Result<SyncStats> {
-    let raw_dir = data_dir
-        .join("raw")
-        .join(hostname())
-        .join(collector.name());
+    let raw_dir = data_dir.join("raw").join(hostname()).join(collector.name());
     let source = collector.source_dir();
 
     let mut copied = 0usize;

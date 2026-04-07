@@ -188,7 +188,11 @@ fn parse_codex_file(path: &PathBuf) -> Result<Option<Session>> {
 
     // Attach final cumulative token snapshot to the last assistant message
     if let Some(tokens) = last_token_snapshot {
-        if let Some(last_asst) = messages.iter_mut().rev().find(|m| m.role == Role::Assistant) {
+        if let Some(last_asst) = messages
+            .iter_mut()
+            .rev()
+            .find(|m| m.role == Role::Assistant)
+        {
             last_asst.tokens = Some(tokens);
         }
     }

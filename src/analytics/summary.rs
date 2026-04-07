@@ -4,7 +4,7 @@ use serde::Serialize;
 
 use crate::schema::{Role, Session};
 
-use super::tokens::{sum_tokens, TokenTotals};
+use super::tokens::{TokenTotals, sum_tokens};
 
 // ── Result structs ─────────────────────────────────────────────────
 
@@ -85,8 +85,18 @@ pub fn summary(sessions: &[Session]) -> SummaryStats {
         });
         entry.sessions += 1;
         entry.messages += s.messages.len() as u64;
-        let inp: u64 = s.messages.iter().filter_map(|m| m.tokens.as_ref()).filter_map(|t| t.input).sum();
-        let out: u64 = s.messages.iter().filter_map(|m| m.tokens.as_ref()).filter_map(|t| t.output).sum();
+        let inp: u64 = s
+            .messages
+            .iter()
+            .filter_map(|m| m.tokens.as_ref())
+            .filter_map(|t| t.input)
+            .sum();
+        let out: u64 = s
+            .messages
+            .iter()
+            .filter_map(|m| m.tokens.as_ref())
+            .filter_map(|t| t.output)
+            .sum();
         entry.input_tokens += inp;
         entry.output_tokens += out;
     }
@@ -95,7 +105,11 @@ pub fn summary(sessions: &[Session]) -> SummaryStats {
     // Top projects
     let mut projects: HashMap<String, usize> = HashMap::new();
     for s in sessions {
-        let key = format!("[{}] {}", s.tool, s.project.as_deref().unwrap_or("(unknown)"));
+        let key = format!(
+            "[{}] {}",
+            s.tool,
+            s.project.as_deref().unwrap_or("(unknown)")
+        );
         *projects.entry(key).or_default() += 1;
     }
     let mut projects: Vec<_> = projects.into_iter().collect();
@@ -107,8 +121,12 @@ pub fn summary(sessions: &[Session]) -> SummaryStats {
         .collect();
 
     let period = PeriodRange {
-        start: sessions.first().map(|s| s.start_time.format("%Y-%m-%d").to_string()),
-        end: sessions.last().map(|s| s.start_time.format("%Y-%m-%d").to_string()),
+        start: sessions
+            .first()
+            .map(|s| s.start_time.format("%Y-%m-%d").to_string()),
+        end: sessions
+            .last()
+            .map(|s| s.start_time.format("%Y-%m-%d").to_string()),
     };
 
     SummaryStats {

@@ -44,10 +44,10 @@ pub struct PricingConfig {
 impl PricingConfig {
     pub fn load(data_dir: &Path) -> Self {
         let path = data_dir.join("config.toml");
-        
+
         let mut subs = HashMap::new();
         let mut custom_models = Vec::new();
-        
+
         if let Ok(text) = std::fs::read_to_string(&path) {
             #[derive(Deserialize)]
             struct RawConfig {
@@ -57,14 +57,18 @@ impl PricingConfig {
                 models: Vec<ConfigModelPrice>,
             }
             if let Ok(c) = toml::from_str::<RawConfig>(&text) {
-                subs = c.subscriptions.into_iter().map(|s| (s.tool.clone(), s)).collect();
+                subs = c
+                    .subscriptions
+                    .into_iter()
+                    .map(|s| (s.tool.clone(), s))
+                    .collect();
                 custom_models = c.models;
             }
         }
-        
+
         let mut models = Self::default_models();
         models.extend(custom_models);
-        
+
         PricingConfig {
             subscriptions: subs,
             models,
@@ -73,19 +77,123 @@ impl PricingConfig {
 
     fn default_models() -> Vec<ConfigModelPrice> {
         vec![
-            ConfigModelPrice { match_pattern: "gpt-5.4".to_string(), price: ModelPrice { input: 2.50, output: 15.00, cached_input: 0.25, cache_write: 2.50 } },
-            ConfigModelPrice { match_pattern: "gpt-5.3-codex".to_string(), price: ModelPrice { input: 1.75, output: 14.00, cached_input: 0.175, cache_write: 1.75 } },
-            ConfigModelPrice { match_pattern: "gpt-5.1-codex".to_string(), price: ModelPrice { input: 1.25, output: 10.00, cached_input: 0.125, cache_write: 1.25 } },
-            ConfigModelPrice { match_pattern: "gpt-5-codex".to_string(), price: ModelPrice { input: 1.25, output: 10.00, cached_input: 0.125, cache_write: 1.25 } },
-            ConfigModelPrice { match_pattern: "gpt-5".to_string(), price: ModelPrice { input: 1.25, output: 10.00, cached_input: 0.125, cache_write: 1.25 } },
-            ConfigModelPrice { match_pattern: "gemini-3.1-pro".to_string(), price: ModelPrice { input: 2.00, output: 12.00, cached_input: 0.20, cache_write: 2.00 } },
-            ConfigModelPrice { match_pattern: "gemini-3-pro".to_string(), price: ModelPrice { input: 2.00, output: 12.00, cached_input: 0.20, cache_write: 2.00 } },
-            ConfigModelPrice { match_pattern: "gemini-3-flash".to_string(), price: ModelPrice { input: 0.50, output: 3.00, cached_input: 0.05, cache_write: 0.50 } },
-            ConfigModelPrice { match_pattern: "gemini-2.5-pro".to_string(), price: ModelPrice { input: 1.25, output: 10.00, cached_input: 0.125, cache_write: 1.25 } },
-            ConfigModelPrice { match_pattern: "gemini".to_string(), price: ModelPrice { input: 1.25, output: 10.00, cached_input: 0.125, cache_write: 1.25 } },
-            ConfigModelPrice { match_pattern: "opus".to_string(), price: ModelPrice { input: 5.00, output: 25.00, cached_input: 0.50, cache_write: 10.00 } },
-            ConfigModelPrice { match_pattern: "sonnet".to_string(), price: ModelPrice { input: 3.00, output: 15.00, cached_input: 0.30, cache_write: 6.00 } },
-            ConfigModelPrice { match_pattern: "haiku".to_string(), price: ModelPrice { input: 1.00, output: 5.00, cached_input: 0.10, cache_write: 2.00 } },
+            ConfigModelPrice {
+                match_pattern: "gpt-5.4".to_string(),
+                price: ModelPrice {
+                    input: 2.50,
+                    output: 15.00,
+                    cached_input: 0.25,
+                    cache_write: 2.50,
+                },
+            },
+            ConfigModelPrice {
+                match_pattern: "gpt-5.3-codex".to_string(),
+                price: ModelPrice {
+                    input: 1.75,
+                    output: 14.00,
+                    cached_input: 0.175,
+                    cache_write: 1.75,
+                },
+            },
+            ConfigModelPrice {
+                match_pattern: "gpt-5.1-codex".to_string(),
+                price: ModelPrice {
+                    input: 1.25,
+                    output: 10.00,
+                    cached_input: 0.125,
+                    cache_write: 1.25,
+                },
+            },
+            ConfigModelPrice {
+                match_pattern: "gpt-5-codex".to_string(),
+                price: ModelPrice {
+                    input: 1.25,
+                    output: 10.00,
+                    cached_input: 0.125,
+                    cache_write: 1.25,
+                },
+            },
+            ConfigModelPrice {
+                match_pattern: "gpt-5".to_string(),
+                price: ModelPrice {
+                    input: 1.25,
+                    output: 10.00,
+                    cached_input: 0.125,
+                    cache_write: 1.25,
+                },
+            },
+            ConfigModelPrice {
+                match_pattern: "gemini-3.1-pro".to_string(),
+                price: ModelPrice {
+                    input: 2.00,
+                    output: 12.00,
+                    cached_input: 0.20,
+                    cache_write: 2.00,
+                },
+            },
+            ConfigModelPrice {
+                match_pattern: "gemini-3-pro".to_string(),
+                price: ModelPrice {
+                    input: 2.00,
+                    output: 12.00,
+                    cached_input: 0.20,
+                    cache_write: 2.00,
+                },
+            },
+            ConfigModelPrice {
+                match_pattern: "gemini-3-flash".to_string(),
+                price: ModelPrice {
+                    input: 0.50,
+                    output: 3.00,
+                    cached_input: 0.05,
+                    cache_write: 0.50,
+                },
+            },
+            ConfigModelPrice {
+                match_pattern: "gemini-2.5-pro".to_string(),
+                price: ModelPrice {
+                    input: 1.25,
+                    output: 10.00,
+                    cached_input: 0.125,
+                    cache_write: 1.25,
+                },
+            },
+            ConfigModelPrice {
+                match_pattern: "gemini".to_string(),
+                price: ModelPrice {
+                    input: 1.25,
+                    output: 10.00,
+                    cached_input: 0.125,
+                    cache_write: 1.25,
+                },
+            },
+            ConfigModelPrice {
+                match_pattern: "opus".to_string(),
+                price: ModelPrice {
+                    input: 5.00,
+                    output: 25.00,
+                    cached_input: 0.50,
+                    cache_write: 10.00,
+                },
+            },
+            ConfigModelPrice {
+                match_pattern: "sonnet".to_string(),
+                price: ModelPrice {
+                    input: 3.00,
+                    output: 15.00,
+                    cached_input: 0.30,
+                    cache_write: 6.00,
+                },
+            },
+            ConfigModelPrice {
+                match_pattern: "haiku".to_string(),
+                price: ModelPrice {
+                    input: 1.00,
+                    output: 5.00,
+                    cached_input: 0.10,
+                    cache_write: 2.00,
+                },
+            },
         ]
     }
 }
@@ -112,11 +220,12 @@ impl PricingProvider for PricingConfig {
             1.0
         }
     }
-    
+
     fn price_for(&self, model: &str) -> Option<ModelPrice> {
         let m = model.to_lowercase();
         for config_model in &self.models {
-            if m.contains(&config_model.match_pattern) || m.starts_with(&config_model.match_pattern) {
+            if m.contains(&config_model.match_pattern) || m.starts_with(&config_model.match_pattern)
+            {
                 return Some(config_model.price.clone());
             }
         }

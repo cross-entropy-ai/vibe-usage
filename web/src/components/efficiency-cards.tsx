@@ -9,20 +9,19 @@ function safeDivide(numerator: number, denominator: number): number | null {
 }
 
 export function EfficiencyCards({ summary }: { summary: Summary }) {
-  const totalTokens =
-    summary.tokens.input + summary.tokens.output + summary.tokens.thinking;
+  const totalSessions = summary.daily.reduce((sum, entry) => sum + entry.sessions, 0);
+  const totalMessages = summary.daily.reduce((sum, entry) => sum + entry.messages, 0);
+  const inputTokens = summary.daily.reduce((sum, entry) => sum + entry.input_tokens, 0);
+  const outputTokens = summary.daily.reduce((sum, entry) => sum + entry.output_tokens, 0);
+  const totalTokens = inputTokens + outputTokens;
 
-  const tokensPerSession = safeDivide(totalTokens, summary.total_sessions);
-  const tokensPerMessage = safeDivide(totalTokens, summary.messages.total);
+  const tokensPerSession = safeDivide(totalTokens, totalSessions);
+  const tokensPerMessage = safeDivide(totalTokens, totalMessages);
   const messagesPerSession = safeDivide(
-    summary.messages.total,
-    summary.total_sessions,
+    totalMessages,
+    totalSessions,
   );
-  const cacheHitRate = safeDivide(
-    summary.tokens.cache_read * 100,
-    summary.tokens.input + summary.tokens.cache_read,
-  );
-  const thinkingShare = safeDivide(summary.tokens.thinking * 100, totalTokens);
+  const outputShare = safeDivide(outputTokens * 100, totalTokens);
 
   const metrics = [
     {
@@ -45,12 +44,9 @@ export function EfficiencyCards({ summary }: { summary: Summary }) {
       icon: Gauge,
     },
     {
-      title: "Reasoning Share",
-      value: thinkingShare !== null ? `${thinkingShare.toFixed(1)}%` : "\u2013",
-      description:
-        cacheHitRate !== null
-          ? `Thinking tokens in total load. Cache hit rate ${cacheHitRate.toFixed(1)}%`
-          : "Thinking tokens in total load",
+      title: "Output Share",
+      value: outputShare !== null ? `${outputShare.toFixed(1)}%` : "\u2013",
+      description: "Share of output tokens in total visible load",
       icon: BrainCircuit,
     },
   ];

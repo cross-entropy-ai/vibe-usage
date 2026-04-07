@@ -5,7 +5,7 @@ use serde::Serialize;
 
 use crate::schema::{Role, Session};
 
-use super::{percentile_u64, BucketCount};
+use super::{BucketCount, percentile_u64};
 
 // ── Result structs ─────────────────────────────────────────────────
 
@@ -213,8 +213,14 @@ pub fn messages_latency(sessions: &[Session]) -> LatencyStats {
     let histogram: Vec<BucketCount> = buckets
         .iter()
         .map(|(label, lo, hi)| {
-            let count = all_durations.iter().filter(|d| **d >= *lo && **d < *hi).count();
-            BucketCount { bucket: label, count }
+            let count = all_durations
+                .iter()
+                .filter(|d| **d >= *lo && **d < *hi)
+                .count();
+            BucketCount {
+                bucket: label,
+                count,
+            }
         })
         .collect();
 

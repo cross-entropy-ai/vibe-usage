@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use axum::{extract::State, response::Json, routing::get, Router};
+use axum::{Router, extract::State, response::Json, routing::get};
 
 use crate::analytics;
-use crate::query::{collect_sessions, AppState};
+use crate::query::{AppState, collect_sessions};
 
 async fn conversations(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     let sessions = collect_sessions(&state).await;

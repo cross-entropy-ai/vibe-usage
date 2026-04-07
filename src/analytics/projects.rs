@@ -71,17 +71,19 @@ pub fn projects(sessions: &[Session]) -> Vec<ProjectStats> {
     for s in sessions {
         let key = s.project.as_deref().unwrap_or("(unknown)").to_string();
         let day = s.start_time.format("%Y-%m-%d").to_string();
-        let entry = project_map.entry(key.clone()).or_insert_with(|| ProjectStats {
-            name: key,
-            sessions: 0,
-            messages: 0,
-            input_tokens: 0,
-            output_tokens: 0,
-            duration_ms: 0,
-            tools: HashMap::new(),
-            first_seen: day.clone(),
-            last_seen: day.clone(),
-        });
+        let entry = project_map
+            .entry(key.clone())
+            .or_insert_with(|| ProjectStats {
+                name: key,
+                sessions: 0,
+                messages: 0,
+                input_tokens: 0,
+                output_tokens: 0,
+                duration_ms: 0,
+                tools: HashMap::new(),
+                first_seen: day.clone(),
+                last_seen: day.clone(),
+            });
         entry.sessions += 1;
         entry.messages += s.messages.len();
         entry.duration_ms += s.duration_ms.unwrap_or(0);
@@ -123,14 +125,16 @@ pub fn directories(sessions: &[Session]) -> Vec<DirectoryStats> {
             None => continue,
         };
 
-        let entry = dir_map.entry(cwd.clone()).or_insert_with(|| DirectoryStats {
-            directory: cwd,
-            sessions: 0,
-            messages: 0,
-            input_tokens: 0,
-            output_tokens: 0,
-            tools: HashMap::new(),
-        });
+        let entry = dir_map
+            .entry(cwd.clone())
+            .or_insert_with(|| DirectoryStats {
+                directory: cwd,
+                sessions: 0,
+                messages: 0,
+                input_tokens: 0,
+                output_tokens: 0,
+                tools: HashMap::new(),
+            });
         entry.sessions += 1;
         entry.messages += s.messages.len();
         *entry.tools.entry(s.tool.to_string()).or_default() += 1;
@@ -151,14 +155,16 @@ pub fn hosts_summary(sessions: &[Session]) -> Vec<HostStats> {
     let mut host_map: HashMap<String, HostStats> = HashMap::new();
     for s in sessions {
         let name = s.hostname.as_deref().unwrap_or("unknown");
-        let entry = host_map.entry(name.to_string()).or_insert_with(|| HostStats {
-            hostname: name.to_string(),
-            sessions: 0,
-            messages: 0,
-            input_tokens: 0,
-            output_tokens: 0,
-            tools: HashMap::new(),
-        });
+        let entry = host_map
+            .entry(name.to_string())
+            .or_insert_with(|| HostStats {
+                hostname: name.to_string(),
+                sessions: 0,
+                messages: 0,
+                input_tokens: 0,
+                output_tokens: 0,
+                tools: HashMap::new(),
+            });
         entry.sessions += 1;
         entry.messages += s.messages.len();
         *entry.tools.entry(s.tool.to_string()).or_default() += 1;
@@ -188,15 +194,17 @@ pub fn git_activity(sessions: &[Session]) -> Vec<GitRepoStats> {
         };
 
         let day = s.start_time.format("%Y-%m-%d").to_string();
-        let entry = repos.entry(repo_key.clone()).or_insert_with(|| GitRepoStats {
-            repo: repo_key,
-            branches: Vec::new(),
-            sessions: 0,
-            messages: 0,
-            input_tokens: 0,
-            output_tokens: 0,
-            last_seen: day.clone(),
-        });
+        let entry = repos
+            .entry(repo_key.clone())
+            .or_insert_with(|| GitRepoStats {
+                repo: repo_key,
+                branches: Vec::new(),
+                sessions: 0,
+                messages: 0,
+                input_tokens: 0,
+                output_tokens: 0,
+                last_seen: day.clone(),
+            });
         entry.sessions += 1;
         entry.messages += s.messages.len();
         if day > entry.last_seen {

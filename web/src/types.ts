@@ -220,8 +220,8 @@ export interface CostData {
 
 export interface ConversationsInsight {
   depth: { histogram: { bucket: string; count: number }[]; avg: number; median: number; total_sessions: number };
-  prompt_length: { avg_chars: number; median_chars: number; total: number };
-  response_length: { avg_chars: number; median_chars: number; total: number };
+  prompt_length: { avg_chars: number; median_chars: number; total: number; histogram: { bucket: string; count: number }[] };
+  response_length: { avg_chars: number; median_chars: number; total: number; histogram: { bucket: string; count: number }[] };
 }
 
 export interface CacheEntry {

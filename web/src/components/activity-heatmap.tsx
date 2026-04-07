@@ -111,7 +111,7 @@ export function ActivityHeatmap({ daily }: { daily: DailyStat[] }) {
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-base">Activity</CardTitle>
         <p className="text-xs text-muted-foreground">
-          {totalSessions} sessions in the last year &middot; {activeDays} active days
+          {totalSessions} sessions in the selected window &middot; {activeDays} active days
         </p>
       </CardHeader>
       <CardContent className="overflow-x-auto">

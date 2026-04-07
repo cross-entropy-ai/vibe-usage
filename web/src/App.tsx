@@ -21,8 +21,9 @@ import {
   type ToolLens,
   type TrendWindow,
 } from "@/components/dashboard-shell";
-import { fmtNum, fmtUsd } from "@/lib/formatters";
+import { fmtNum } from "@/lib/formatters";
 import { TOOL_NAMES, type Tool } from "@/lib/tools";
+import type { Summary } from "@/types";
 
 function DashboardFallback({ loading, errors }: { loading: boolean; errors: string[] }) {
   if (loading) {
@@ -109,49 +110,59 @@ function filterToolCounts(counts: Record<Tool, number>, toolLens: ToolLens): Rec
   }, {} as Record<Tool, number>);
 }
 
+function getDailySummaryMetrics(summary: Summary | null) {
+  if (!summary) return null;
+
+  return summary.daily.reduce(
+    (acc, entry) => {
+      acc.sessions += entry.sessions;
+      acc.messages += entry.messages;
+      acc.inputTokens += entry.input_tokens;
+      acc.outputTokens += entry.output_tokens;
+      return acc;
+    },
+    {
+      sessions: 0,
+      messages: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      activeDays: summary.daily.length,
+    },
+  );
+}
+
 function Dashboard() {
   const { data, errors, loading } = useDashboardData();
   const [trendWindow, setTrendWindow] = useState<TrendWindow>("full-year");
   const [toolLens, setToolLens] = useState<ToolLens>("all");
-  const sectionMeta = [
-    {
-      id: "cost",
-      label: "Cost",
-      blurb: "Equivalent API cost, savings, and pricing pressure.",
-    },
-    {
-      id: "overview",
-      label: "Overview",
-      blurb: "Daily volume, throughput, and quick operational context.",
-    },
-    {
-      id: "activity",
-      label: "Activity",
-      blurb: "Languages, heatmaps, and session complexity patterns.",
-    },
-    {
-      id: "tokens",
-      label: "Tokens",
-      blurb: "Token flow, cache leverage, and thinking utilization.",
-    },
-    {
-      id: "models-tools",
-      label: "Models & Tools",
-      blurb: "Routing, tool execution, and model switching behavior.",
-    },
-    {
-      id: "workspace",
-      label: "Workspace",
-      blurb: "Projects, hosts, git repos, and directory concentration.",
-    },
-  ] as const;
 
   const filteredSummary = useMemo(() => {
     if (!data?.summary) return null;
     const daily = filterByTrendWindow(data.summary.daily, (entry) => entry.date, trendWindow);
+    const metrics = daily.reduce(
+      (acc, entry) => {
+        acc.sessions += entry.sessions;
+        acc.messages += entry.messages;
+        acc.inputTokens += entry.input_tokens;
+        acc.outputTokens += entry.output_tokens;
+        return acc;
+      },
+      { sessions: 0, messages: 0, inputTokens: 0, outputTokens: 0 },
+    );
+
     return {
       ...data.summary,
       daily,
+      total_sessions: metrics.sessions,
+      messages: {
+        ...data.summary.messages,
+        total: metrics.messages,
+      },
+      tokens: {
+        ...data.summary.tokens,
+        input: metrics.inputTokens,
+        output: metrics.outputTokens,
+      },
       by_tool: filterToolCounts(data.summary.by_tool, toolLens),
       period: {
         start: daily[0]?.date ?? data.summary.period.start,
@@ -198,6 +209,11 @@ function Dashboard() {
       daily: filterByTrendWindow(data.duration.daily, (entry) => entry.date, trendWindow),
     };
   }, [data, trendWindow]);
+  const summaryMetrics = useMemo(
+    () => getDailySummaryMetrics(filteredSummary),
+    [filteredSummary],
+  );
+  const canShowGlobalBreakdowns = trendWindow === "all" && toolLens === "all";
 
   if (loading || !data || Object.values(data).every((v) => v === null)) {
     return <DashboardFallback loading={loading} errors={errors} />;
@@ -214,8 +230,6 @@ function Dashboard() {
           <DashboardHeader
             summary={filteredSummary}
             cost={filteredCost}
-            modelSwitches={data.modelSwitches}
-            projects={data.projects}
             toolCounts={data.summary?.by_tool ?? null}
             trendWindow={trendWindow}
             onTrendWindowChange={setTrendWindow}
@@ -271,23 +285,23 @@ function Dashboard() {
               title="Usage Snapshot"
               description="Start with a high-signal view of volume, utilization, and trend direction before drilling into the lower-level breakdowns."
               highlights={[
-                ...(data.summary
+                ...(summaryMetrics
                   ? [
                       {
                         label: "Sessions",
-                        value: fmtNum(data.summary.total_sessions),
+                        value: fmtNum(summaryMetrics.sessions),
                       },
                       {
                         label: "Messages",
-                        value: fmtNum(data.summary.messages.total),
+                        value: fmtNum(summaryMetrics.messages),
                       },
                     ]
                   : []),
-                ...(data.summary
+                ...(summaryMetrics
                   ? [
                       {
                         label: "Active days",
-                        value: fmtNum(data.summary.daily.length),
+                        value: fmtNum(summaryMetrics.activeDays),
                       },
                     ]
                   : []),
@@ -302,11 +316,11 @@ function Dashboard() {
               title="Agent Activity Profile"
               description="Understand when coding agents are busiest, which language/task categories dominate, and how session complexity shifts over time."
               highlights={
-                data.summary?.period.start && data.summary?.period.end
+                filteredSummary?.period.start && filteredSummary.period.end
                   ? [
                       {
                         label: "Period",
-                        value: `${data.summary.period.start} to ${data.summary.period.end}`,
+                        value: `${filteredSummary.period.start} to ${filteredSummary.period.end}`,
                       },
                     ]
                   : undefined
@@ -321,20 +335,24 @@ function Dashboard() {
               title="Token Flow and Cache Efficiency"
               description="Inspect token load, caching leverage, and reasoning-heavy usage to identify which agents or workflows are driving compute intensity."
               highlights={
-                data.summary
+                summaryMetrics
                   ? [
                       {
                         label: "Input",
-                        value: fmtNum(data.summary.tokens.input),
+                        value: fmtNum(summaryMetrics.inputTokens),
                       },
                       {
                         label: "Output",
-                        value: fmtNum(data.summary.tokens.output),
+                        value: fmtNum(summaryMetrics.outputTokens),
                       },
-                      {
-                        label: "Thinking",
-                        value: fmtNum(data.summary.tokens.thinking),
-                      },
+                      ...(canShowGlobalBreakdowns && data.summary
+                        ? [
+                            {
+                              label: "Thinking",
+                              value: fmtNum(data.summary.tokens.thinking),
+                            },
+                          ]
+                        : []),
                     ]
                   : undefined
               }

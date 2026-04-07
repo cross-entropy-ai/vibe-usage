@@ -1,17 +1,13 @@
 import type { ReactNode } from "react";
 import {
   Activity,
-  ArrowUpRight,
   Bot,
-  CalendarRange,
-  FolderGit2,
   Gauge,
   LayoutPanelTop,
   Sparkles,
-  Workflow,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -22,22 +18,12 @@ import {
 import {
   fmtNum,
   fmtUsd,
-  fmtUsdShort,
 } from "@/lib/formatters";
 import { TOOL_NAMES, type Tool, toolLabel } from "@/lib/tools";
-import { sortedToolEntries, toolColor } from "@/lib/utils";
 import type {
   CostData,
-  ModelSwitchData,
-  ProjectDetail,
   Summary,
 } from "@/types";
-
-interface DashboardNavItem {
-  id: string;
-  label: string;
-  blurb: string;
-}
 
 export type TrendWindow =
   | "24h"
@@ -53,8 +39,6 @@ export type ToolLens = "all" | Tool;
 interface DashboardHeaderProps {
   summary: Summary | null;
   cost: CostData | null;
-  modelSwitches: ModelSwitchData | null;
-  projects: ProjectDetail[] | null;
   toolCounts: Record<Tool, number> | null;
   trendWindow: TrendWindow;
   onTrendWindowChange: (value: TrendWindow) => void;
@@ -74,17 +58,6 @@ interface DashboardSectionProps {
 function safeDivide(numerator: number, denominator: number): number | null {
   if (denominator === 0) return null;
   return numerator / denominator;
-}
-
-function formatDateLabel(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(date);
 }
 
 function fmtMillions(n: number): string {
@@ -128,8 +101,6 @@ function ToolbarGroup<T extends string>({
 export function DashboardHeader({
   summary,
   cost,
-  modelSwitches,
-  projects,
   toolCounts,
   trendWindow,
   onTrendWindowChange,
@@ -154,29 +125,16 @@ export function DashboardHeader({
   const windowCost = cost
     ? cost.daily.reduce((sum, entry) => sum + entry.equivalent_api_cost_usd, 0)
     : 0;
-  const avgCostPerProject =
-    projects && projects.length > 0 ? windowCost / projects.length : null;
-  const cacheHitRate = summary
-    ? safeDivide(
-        summary.tokens.cache_read * 100,
-        summary.tokens.input + summary.tokens.cache_read,
-      )
-    : null;
-  const topProject =
-    projects?.[0]?.name ?? summary?.top_projects[0]?.name ?? "No project context";
-  const activeTools =
-    summary?.by_tool
-      ? sortedToolEntries(summary.by_tool).filter(([, count]) => count > 0)
-      : [];
+  const avgCostPerActiveDay = safeDivide(windowCost, activeDays);
 
   const pulse = [
     {
       label: "Equivalent Cost",
       value: cost ? fmtUsd(windowCost) : "N/A",
       detail:
-        avgCostPerProject !== null
-          ? `${fmtUsd(avgCostPerProject)} avg per project`
-          : "No project breakdown available",
+        avgCostPerActiveDay !== null
+          ? `${fmtUsd(avgCostPerActiveDay)} avg per active day`
+          : "No active-day coverage",
       icon: Sparkles,
     },
     {
@@ -205,12 +163,6 @@ export function DashboardHeader({
       icon: Gauge,
     },
   ];
-
-  const coverageStart = formatDateLabel(summary?.period.start);
-  const coverageEnd = formatDateLabel(summary?.period.end);
-  const coverageLabel =
-    coverageStart && coverageEnd ? `${coverageStart} to ${coverageEnd}` : "No date coverage";
-  const toolLensLabel = toolLens === "all" ? "All tools" : toolLabel(toolLens);
 
   return (
     <Card className="border border-slate-200/80 bg-white/90 shadow-sm backdrop-blur-sm">
@@ -286,7 +238,10 @@ export function DashboardHeader({
                 { value: "all", label: "All" },
                 ...TOOL_NAMES.map((tool) => ({
                   value: tool,
-                  label: `${toolLabel(tool)} (${fmtNum(toolCounts?.[tool] ?? 0)})`,
+                  label:
+                    trendWindow === "all"
+                      ? `${toolLabel(tool)} (${fmtNum(toolCounts?.[tool] ?? 0)})`
+                      : toolLabel(tool),
                 })),
               ]}
             />
@@ -294,7 +249,7 @@ export function DashboardHeader({
           <p className="mt-2 text-[11px] leading-4 text-slate-500">
             Trend window updates time-based charts and summaries. Tool lens only
             narrows tool-comparison views where the dataset supports per-tool
-            splits. Headline KPIs remain global.
+            splits. Tool session counts are shown only in the all-time view.
           </p>
         </div>
       </CardContent>
