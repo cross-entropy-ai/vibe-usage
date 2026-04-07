@@ -38,8 +38,12 @@ pub fn push(data_dir: &Path) -> Result<()> {
 
     eprintln!("pushing {} → {}", src, dest);
 
+    // --rsync-path trick: create remote dir before transfer (macOS rsync lacks --mkpath)
+    let (_remote_host, remote_path) = dest.split_once(':').context("invalid remote format")?;
+    let rsync_path = format!("mkdir -p {} && rsync", remote_path);
+
     let status = Command::new("rsync")
-        .args(["-az", "--mkpath", "--info=progress2", &src, &dest])
+        .args(["-az", "--progress", "--rsync-path", &rsync_path, &src, &dest])
         .status()
         .context("failed to run rsync")?;
 
@@ -64,7 +68,7 @@ pub fn pull(data_dir: &Path) -> Result<()> {
     eprintln!("pulling {} → {}", src, dest);
 
     let status = Command::new("rsync")
-        .args(["-az", "--mkpath", "--info=progress2", &src, &dest])
+        .args(["-az", "--progress", &src, &dest])
         .status()
         .context("failed to run rsync")?;
 

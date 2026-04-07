@@ -4,13 +4,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toolColor, sortedToolEntries } from "@/lib/utils";
+import { fmtNum } from "@/lib/formatters";
 import type { HostStat } from "@/types";
-
-function fmtNum(n: number) {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-  return n.toString();
-}
 
 export function HostsTable({ data }: { data: HostStat[] }) {
   if (data.length === 0) return null;

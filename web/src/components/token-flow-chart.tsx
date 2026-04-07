@@ -1,30 +1,11 @@
 import { useMemo } from "react";
 import { Sankey, Tooltip, Layer, Rectangle } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { toolHslColor, toolLabel } from "@/lib/tools";
+import { fmtNum, shortenModel } from "@/lib/formatters";
 import type { CostModelEntry } from "@/types";
 
-const TOOL_COLORS: Record<string, string> = {
-  claude: "hsl(221 83% 53%)",
-  gemini: "hsl(142 71% 45%)",
-  codex: "hsl(25 95% 53%)",
-  kimi: "hsl(271 76% 53%)",
-};
-
 const MODEL_COLOR = "hsl(215 20% 65%)";
-
-function shortenModel(name: string): string {
-  return name
-    .replace(/^models\//, "")
-    .replace(/-\d{8}$/, "")
-    .slice(0, 30);
-}
-
-function fmtTokens(n: number): string {
-  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1) + "B";
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-  return n.toString();
-}
 
 interface SankeyNode {
   name: string;
@@ -76,7 +57,7 @@ function SankeyNode(props: {
   );
 }
 
-export function TokenFlowChart({ data }: { data: CostModelEntry[] }) {
+export function TokenFlowChart({ data, modelLimit = 12 }: { data: CostModelEntry[]; modelLimit?: number }) {
   const sankeyData = useMemo(() => {
     // Aggregate: tool → model → total tokens
     const flows = new Map<string, Map<string, number>>();
@@ -85,7 +66,7 @@ export function TokenFlowChart({ data }: { data: CostModelEntry[] }) {
       if (total === 0) continue;
 
       const tool = entry.tool;
-      const model = shortenModel(entry.model);
+      const model = shortenModel(entry.model).slice(0, 30);
       if (!flows.has(tool)) flows.set(tool, new Map());
       const toolMap = flows.get(tool)!;
       toolMap.set(model, (toolMap.get(model) ?? 0) + total);
@@ -104,13 +85,13 @@ export function TokenFlowChart({ data }: { data: CostModelEntry[] }) {
       return { model, total };
     });
     modelTotals.sort((a, b) => b.total - a.total);
-    const topModels = modelTotals.slice(0, 12).map((m) => m.model);
+    const topModels = modelTotals.slice(0, modelLimit).map((m) => m.model);
 
     const nodes: SankeyNode[] = [
       ...tools.map((t) => ({
         name: t,
-        displayName: t.charAt(0).toUpperCase() + t.slice(1),
-        color: TOOL_COLORS[t] ?? MODEL_COLOR,
+        displayName: toolLabel(t),
+        color: toolHslColor(t),
       })),
       ...topModels.map((m) => ({
         name: m,
@@ -165,7 +146,7 @@ export function TokenFlowChart({ data }: { data: CostModelEntry[] }) {
       <CardHeader>
         <CardTitle className="text-base">Token Flow</CardTitle>
         <CardDescription>
-          Tool → Model token distribution &middot; {fmtTokens(totalTokens)} total
+          Tool → Model token distribution &middot; {fmtNum(totalTokens)} total
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -181,7 +162,7 @@ export function TokenFlowChart({ data }: { data: CostModelEntry[] }) {
             node={<SankeyNode x={0} y={0} width={0} height={0} index={0} payload={{ name: "", displayName: "", color: "" }} />}
           >
             <Tooltip
-              formatter={(value) => fmtTokens(Number(value))}
+              formatter={(value) => fmtNum(Number(value))}
             />
           </Sankey>
         </div>

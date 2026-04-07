@@ -7,6 +7,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import { fmtDate, fmtNum } from "@/lib/formatters";
 import type { DailyStat } from "@/types";
 
 const config = {
@@ -14,18 +15,6 @@ const config = {
   tokens_per_message: { label: "Tokens/Message", color: "var(--chart-2)" },
   messages_per_session: { label: "Messages/Session", color: "var(--chart-3)" },
 } satisfies ChartConfig;
-
-function fmtDate(d: string) {
-  const [y, m, day] = d.split("-").map(Number);
-  const x = new Date(y, m - 1, day);
-  return `${x.getMonth() + 1}/${x.getDate()}`;
-}
-
-function fmtK(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-  return Math.round(n).toString();
-}
 
 export function EfficiencyTrendChart({ daily }: { daily: DailyStat[] }) {
   const data = useMemo(() => {
@@ -65,7 +54,7 @@ export function EfficiencyTrendChart({ daily }: { daily: DailyStat[] }) {
             />
             <YAxis
               yAxisId="tokens"
-              tickFormatter={fmtK}
+              tickFormatter={fmtNum}
               tickLine={false}
               axisLine={false}
               tickMargin={8}
@@ -82,7 +71,7 @@ export function EfficiencyTrendChart({ daily }: { daily: DailyStat[] }) {
                 <ChartTooltipContent
                   formatter={(value, name) => {
                     if (name === "messages_per_session") return (value as number).toFixed(1);
-                    return fmtK(value as number);
+                    return fmtNum(value as number);
                   }}
                 />
               }

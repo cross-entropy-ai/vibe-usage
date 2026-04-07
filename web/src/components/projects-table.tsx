@@ -4,22 +4,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toolColor, sortedToolEntries } from "@/lib/utils";
+import { fmtNum, fmtDurationMs } from "@/lib/formatters";
 import type { ProjectDetail } from "@/types";
 
-function fmtNum(n: number) {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-  return n.toString();
-}
-
-function fmtDuration(ms: number) {
-  const min = ms / 60000;
-  if (min >= 60) return (min / 60).toFixed(1) + "h";
-  return Math.round(min) + "m";
-}
-
-export function ProjectsTable({ data }: { data: ProjectDetail[] }) {
-  const top = data.slice(0, 20);
+export function ProjectsTable({ data, limit = 20 }: { data: ProjectDetail[]; limit?: number }) {
+  const top = data.slice(0, limit);
 
   return (
     <Card>
@@ -60,7 +49,7 @@ export function ProjectsTable({ data }: { data: ProjectDetail[] }) {
                 <TableCell className="text-right font-bold">{p.sessions}</TableCell>
                 <TableCell className="text-right">{fmtNum(p.messages)}</TableCell>
                 <TableCell className="text-right">{fmtNum(p.input_tokens + p.output_tokens)}</TableCell>
-                <TableCell className="text-right">{p.duration_ms > 0 ? fmtDuration(p.duration_ms) : "—"}</TableCell>
+                <TableCell className="text-right">{p.duration_ms > 0 ? fmtDurationMs(p.duration_ms) : "—"}</TableCell>
                 <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap">
                   {p.first_seen === p.last_seen ? p.first_seen : `${p.first_seen} — ${p.last_seen}`}
                 </TableCell>

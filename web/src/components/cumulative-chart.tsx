@@ -7,23 +7,13 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import { fmtDate, fmtUsdShort } from "@/lib/formatters";
 import type { DailyStat, CostDailyEntry } from "@/types";
 
 const config = {
   sessions: { label: "Sessions", color: "var(--chart-1)" },
   cost: { label: "API Cost ($)", color: "var(--chart-4)" },
 } satisfies ChartConfig;
-
-function fmtDate(d: string) {
-  const [y, m, day] = d.split("-").map(Number);
-  const x = new Date(y, m - 1, day);
-  return `${x.getMonth() + 1}/${x.getDate()}`;
-}
-
-function fmtUsd(n: number): string {
-  if (n >= 1000) return "$" + (n / 1000).toFixed(1) + "K";
-  return "$" + n.toFixed(0);
-}
 
 export function CumulativeChart({
   daily,
@@ -66,7 +56,7 @@ export function CumulativeChart({
       <CardHeader>
         <CardTitle className="text-base">Cumulative Growth</CardTitle>
         <CardDescription>
-          {totalSessions.toLocaleString()} sessions &middot; {fmtUsd(totalCost)} equivalent API cost
+          {totalSessions.toLocaleString()} sessions &middot; {fmtUsdShort(totalCost)} equivalent API cost
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -89,7 +79,7 @@ export function CumulativeChart({
             <YAxis
               yAxisId="cost"
               orientation="right"
-              tickFormatter={fmtUsd}
+              tickFormatter={fmtUsdShort}
               tickLine={false}
               axisLine={false}
               tickMargin={8}

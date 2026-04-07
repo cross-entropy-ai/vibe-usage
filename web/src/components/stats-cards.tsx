@@ -1,13 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toolColor, sortedToolEntries } from "@/lib/utils";
+import { fmtNum } from "@/lib/formatters";
 import type { Summary } from "@/types";
-
-function formatNumber(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-  return n.toString();
-}
 
 export function StatsCards({ summary }: { summary: Summary }) {
   const totalTokens = summary.tokens.input + summary.tokens.output + summary.tokens.thinking;
@@ -37,9 +32,9 @@ export function StatsCards({ summary }: { summary: Summary }) {
           <CardTitle className="text-sm font-medium">Messages</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{formatNumber(summary.messages.total)}</div>
+          <div className="text-2xl font-bold">{fmtNum(summary.messages.total)}</div>
           <p className="text-xs text-muted-foreground mt-1">
-            {formatNumber(summary.messages.user)} user / {formatNumber(summary.messages.assistant)} assistant
+            {fmtNum(summary.messages.user)} user / {fmtNum(summary.messages.assistant)} assistant
           </p>
         </CardContent>
       </Card>
@@ -49,10 +44,10 @@ export function StatsCards({ summary }: { summary: Summary }) {
           <CardTitle className="text-sm font-medium">Total Tokens</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{formatNumber(totalTokens)}</div>
+          <div className="text-2xl font-bold">{fmtNum(totalTokens)}</div>
           <p className="text-xs text-muted-foreground mt-1">
-            {formatNumber(summary.tokens.input)} in / {formatNumber(summary.tokens.output)} out
-            {summary.tokens.thinking > 0 && ` / ${formatNumber(summary.tokens.thinking)} think`}
+            {fmtNum(summary.tokens.input)} in / {fmtNum(summary.tokens.output)} out
+            {summary.tokens.thinking > 0 && ` / ${fmtNum(summary.tokens.thinking)} think`}
           </p>
         </CardContent>
       </Card>

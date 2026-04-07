@@ -8,6 +8,7 @@ import {
   ChartLegendContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import { fmtNum } from "@/lib/formatters";
 import type { ModelTokens } from "@/types";
 
 const config = {
@@ -15,12 +16,6 @@ const config = {
   output_tokens: { label: "Output", color: "var(--chart-3)" },
   thinking_tokens: { label: "Thinking", color: "var(--chart-4)" },
 } satisfies ChartConfig;
-
-function fmtNum(n: number) {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-  return n.toString();
-}
 
 function shortenModels(names: string[]): string[] {
   const stripped = names.map((n) => n.replace(/^models\//, ""));
@@ -36,8 +31,8 @@ function shortenModels(names: string[]): string[] {
   return chosen.map((n) => n.slice(0, 28));
 }
 
-export function ModelsChart({ data }: { data: ModelTokens[] }) {
-  const slice = data.slice(0, 12);
+export function ModelsChart({ data, limit = 12 }: { data: ModelTokens[]; limit?: number }) {
+  const slice = data.slice(0, limit);
   const labels = shortenModels(slice.map((d) => d.model));
   const top = slice.map((d, i) => ({ ...d, model: labels[i] }));
 

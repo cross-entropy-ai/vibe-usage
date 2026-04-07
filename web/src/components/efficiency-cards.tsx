@@ -1,11 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { fmtNum } from "@/lib/formatters";
 import type { Summary } from "@/types";
-
-function formatWithSuffix(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-  return Math.round(n).toString();
-}
 
 function safeDivide(numerator: number, denominator: number): number | null {
   if (denominator === 0) return null;
@@ -30,12 +25,12 @@ export function EfficiencyCards({ summary }: { summary: Summary }) {
   const metrics = [
     {
       title: "Tokens/Session",
-      value: tokensPerSession !== null ? formatWithSuffix(tokensPerSession) : "\u2013",
+      value: tokensPerSession !== null ? fmtNum(tokensPerSession) : "\u2013",
       description: "Avg tokens per session",
     },
     {
       title: "Tokens/Message",
-      value: tokensPerMessage !== null ? formatWithSuffix(tokensPerMessage) : "\u2013",
+      value: tokensPerMessage !== null ? fmtNum(tokensPerMessage) : "\u2013",
       description: "Avg tokens per message",
     },
     {

@@ -111,3 +111,38 @@ pub fn default_data_dir() -> PathBuf {
         .expect("cannot resolve home dir")
         .join(".vibe-usage")
 }
+
+/// Registry of all known collector names.
+pub fn collector_names() -> &'static [&'static str] {
+    &["gemini", "claude", "codex", "kimi"]
+}
+
+/// Create a collector by name. Returns None for unknown names.
+pub fn create_collector(name: &str) -> Option<Box<dyn Collector + Send + Sync>> {
+    match name {
+        "gemini" => Some(Box::new(gemini::GeminiCollector::new())),
+        "claude" => Some(Box::new(claude::ClaudeCollector::new())),
+        "codex" => Some(Box::new(codex::CodexCollector::new())),
+        "kimi" => Some(Box::new(kimi::KimiCollector::new())),
+        _ => None,
+    }
+}
+
+/// Build collectors filtered by tool names. If `tools` is None, returns all.
+pub fn build_collectors(tools: &Option<Vec<String>>) -> Vec<Box<dyn Collector + Send + Sync>> {
+    let names: Vec<&str> = match tools {
+        Some(ts) => ts.iter().map(|s| s.as_str()).collect(),
+        None => collector_names().to_vec(),
+    };
+
+    names
+        .iter()
+        .filter_map(|name| {
+            let c = create_collector(name);
+            if c.is_none() {
+                eprintln!("unknown tool: {name}");
+            }
+            c
+        })
+        .collect()
+}

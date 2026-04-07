@@ -4,6 +4,7 @@ use std::path::Path;
 use serde::Deserialize;
 
 /// Pricing per 1M tokens (USD).
+#[derive(Debug, Clone, Deserialize)]
 pub struct ModelPrice {
     pub input: f64,
     pub output: f64,
@@ -19,48 +20,89 @@ pub struct Subscription {
     pub monthly_usd: f64,
 }
 
-/// Loaded pricing config: which tools are subscription-based.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ConfigModelPrice {
+    pub match_pattern: String,
+    pub price: ModelPrice,
+}
+
+pub trait PricingProvider: Send + Sync {
+    fn price_for(&self, model: &str) -> Option<ModelPrice>;
+    fn is_subscription(&self, tool: &str) -> bool;
+    fn subscription_for(&self, tool: &str) -> Option<&Subscription>;
+    fn subscription_months(&self, tool: &str, first_date: &str, last_date: &str) -> f64;
+}
+
+/// Loaded pricing config: which tools are subscription-based, and model prices.
+#[derive(Clone)]
 pub struct PricingConfig {
     /// tool name -> Subscription
     pub subscriptions: HashMap<String, Subscription>,
+    pub models: Vec<ConfigModelPrice>,
 }
 
 impl PricingConfig {
     pub fn load(data_dir: &Path) -> Self {
         let path = data_dir.join("config.toml");
-        let subs = if let Ok(text) = std::fs::read_to_string(&path) {
+        
+        let mut subs = HashMap::new();
+        let mut custom_models = Vec::new();
+        
+        if let Ok(text) = std::fs::read_to_string(&path) {
             #[derive(Deserialize)]
             struct RawConfig {
                 #[serde(default)]
                 subscriptions: Vec<Subscription>,
+                #[serde(default)]
+                models: Vec<ConfigModelPrice>,
             }
-            match toml::from_str::<RawConfig>(&text) {
-                Ok(c) => c
-                    .subscriptions
-                    .into_iter()
-                    .map(|s| (s.tool.clone(), s))
-                    .collect(),
-                Err(_) => HashMap::new(),
+            if let Ok(c) = toml::from_str::<RawConfig>(&text) {
+                subs = c.subscriptions.into_iter().map(|s| (s.tool.clone(), s)).collect();
+                custom_models = c.models;
             }
-        } else {
-            HashMap::new()
-        };
+        }
+        
+        let mut models = Self::default_models();
+        models.extend(custom_models);
+        
         PricingConfig {
             subscriptions: subs,
+            models,
         }
     }
 
-    /// Returns true if this tool is subscription-based (no per-token cost).
-    pub fn is_subscription(&self, tool: &str) -> bool {
+    fn default_models() -> Vec<ConfigModelPrice> {
+        vec![
+            ConfigModelPrice { match_pattern: "gpt-5.4".to_string(), price: ModelPrice { input: 2.50, output: 15.00, cached_input: 0.25, cache_write: 2.50 } },
+            ConfigModelPrice { match_pattern: "gpt-5.3-codex".to_string(), price: ModelPrice { input: 1.75, output: 14.00, cached_input: 0.175, cache_write: 1.75 } },
+            ConfigModelPrice { match_pattern: "gpt-5.1-codex".to_string(), price: ModelPrice { input: 1.25, output: 10.00, cached_input: 0.125, cache_write: 1.25 } },
+            ConfigModelPrice { match_pattern: "gpt-5-codex".to_string(), price: ModelPrice { input: 1.25, output: 10.00, cached_input: 0.125, cache_write: 1.25 } },
+            ConfigModelPrice { match_pattern: "gpt-5".to_string(), price: ModelPrice { input: 1.25, output: 10.00, cached_input: 0.125, cache_write: 1.25 } },
+            ConfigModelPrice { match_pattern: "gemini-3.1-pro".to_string(), price: ModelPrice { input: 2.00, output: 12.00, cached_input: 0.20, cache_write: 2.00 } },
+            ConfigModelPrice { match_pattern: "gemini-3-pro".to_string(), price: ModelPrice { input: 2.00, output: 12.00, cached_input: 0.20, cache_write: 2.00 } },
+            ConfigModelPrice { match_pattern: "gemini-3-flash".to_string(), price: ModelPrice { input: 0.50, output: 3.00, cached_input: 0.05, cache_write: 0.50 } },
+            ConfigModelPrice { match_pattern: "gemini-2.5-pro".to_string(), price: ModelPrice { input: 1.25, output: 10.00, cached_input: 0.125, cache_write: 1.25 } },
+            ConfigModelPrice { match_pattern: "gemini".to_string(), price: ModelPrice { input: 1.25, output: 10.00, cached_input: 0.125, cache_write: 1.25 } },
+            ConfigModelPrice { match_pattern: "opus".to_string(), price: ModelPrice { input: 5.00, output: 25.00, cached_input: 0.50, cache_write: 10.00 } },
+            ConfigModelPrice { match_pattern: "sonnet".to_string(), price: ModelPrice { input: 3.00, output: 15.00, cached_input: 0.30, cache_write: 6.00 } },
+            ConfigModelPrice { match_pattern: "haiku".to_string(), price: ModelPrice { input: 1.00, output: 5.00, cached_input: 0.10, cache_write: 2.00 } },
+        ]
+    }
+}
+
+impl PricingProvider for PricingConfig {
+    fn is_subscription(&self, tool: &str) -> bool {
         self.subscriptions.contains_key(tool)
     }
 
-    /// Calculate monthly subscription months between two dates.
-    pub fn subscription_months(&self, tool: &str, first_date: &str, last_date: &str) -> f64 {
+    fn subscription_for(&self, tool: &str) -> Option<&Subscription> {
+        self.subscriptions.get(tool)
+    }
+
+    fn subscription_months(&self, tool: &str, first_date: &str, last_date: &str) -> f64 {
         if !self.is_subscription(tool) {
             return 0.0;
         }
-        // Parse YYYY-MM-DD, count distinct months
         let start = parse_ym(first_date);
         let end = parse_ym(last_date);
         if let (Some((sy, sm)), Some((ey, em))) = (start, end) {
@@ -69,6 +111,16 @@ impl PricingConfig {
         } else {
             1.0
         }
+    }
+    
+    fn price_for(&self, model: &str) -> Option<ModelPrice> {
+        let m = model.to_lowercase();
+        for config_model in &self.models {
+            if m.contains(&config_model.match_pattern) || m.starts_with(&config_model.match_pattern) {
+                return Some(config_model.price.clone());
+            }
+        }
+        None
     }
 }
 
@@ -81,115 +133,6 @@ fn parse_ym(date: &str) -> Option<(u32, u32)> {
     } else {
         None
     }
-}
-
-/// Look up API pricing for a model name. Returns None for unknown models.
-pub fn price_for(model: &str) -> Option<ModelPrice> {
-    let m = model.to_lowercase();
-
-    // ── OpenAI ──────────────────────────────────────────────────
-    if m.starts_with("gpt-5.4") {
-        return Some(ModelPrice {
-            input: 2.50,
-            output: 15.00,
-            cached_input: 0.25,
-            cache_write: 2.50,
-        });
-    }
-    if m.starts_with("gpt-5.3-codex") {
-        return Some(ModelPrice {
-            input: 1.75,
-            output: 14.00,
-            cached_input: 0.175,
-            cache_write: 1.75,
-        });
-    }
-    if m.starts_with("gpt-5.1-codex") {
-        return Some(ModelPrice {
-            input: 1.25,
-            output: 10.00,
-            cached_input: 0.125,
-            cache_write: 1.25,
-        });
-    }
-    if m.starts_with("gpt-5-codex") {
-        return Some(ModelPrice {
-            input: 1.25,
-            output: 10.00,
-            cached_input: 0.125,
-            cache_write: 1.25,
-        });
-    }
-    if m.starts_with("gpt-5") {
-        return Some(ModelPrice {
-            input: 1.25,
-            output: 10.00,
-            cached_input: 0.125,
-            cache_write: 1.25,
-        });
-    }
-
-    // ── Google Gemini (<=200K context pricing) ──────────────────
-    if m.contains("gemini-3.1-pro") || m.contains("gemini-3-pro") {
-        return Some(ModelPrice {
-            input: 2.00,
-            output: 12.00,
-            cached_input: 0.20,
-            cache_write: 2.00,
-        });
-    }
-    if m.contains("gemini-3") && m.contains("flash") {
-        return Some(ModelPrice {
-            input: 0.50,
-            output: 3.00,
-            cached_input: 0.05,
-            cache_write: 0.50,
-        });
-    }
-    if m.contains("gemini-2.5-pro") {
-        return Some(ModelPrice {
-            input: 1.25,
-            output: 10.00,
-            cached_input: 0.125,
-            cache_write: 1.25,
-        });
-    }
-    if m.contains("gemini") {
-        return Some(ModelPrice {
-            input: 1.25,
-            output: 10.00,
-            cached_input: 0.125,
-            cache_write: 1.25,
-        });
-    }
-
-    // ── Anthropic Claude ────────────────────────────────────────
-    if m.contains("opus") {
-        return Some(ModelPrice {
-            input: 5.00,
-            output: 25.00,
-            cached_input: 0.50,
-            cache_write: 10.00,
-        });
-    }
-    if m.contains("sonnet") {
-        return Some(ModelPrice {
-            input: 3.00,
-            output: 15.00,
-            cached_input: 0.30,
-            cache_write: 6.00,
-        });
-    }
-    if m.contains("haiku") {
-        return Some(ModelPrice {
-            input: 1.00,
-            output: 5.00,
-            cached_input: 0.10,
-            cache_write: 2.00,
-        });
-    }
-
-    None
 }
 
 /// Calculate cost in USD given token counts and a price table.

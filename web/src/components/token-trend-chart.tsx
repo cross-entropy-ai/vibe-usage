@@ -8,34 +8,21 @@ import {
   ChartLegendContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import { TOOL_NAMES, toolChartColor, toolLabel } from "@/lib/tools";
+import { fmtNum } from "@/lib/formatters";
 import type { TokensDailyEntry } from "@/types";
 
-const TOOLS = ["claude", "gemini", "codex", "kimi"] as const;
-
-const TOOL_COLORS: Record<string, string> = {
-  claude: "var(--chart-1)",
-  gemini: "var(--chart-2)",
-  codex: "var(--chart-3)",
-  kimi: "var(--chart-4)",
-};
-
 const chartConfig = Object.fromEntries(
-  TOOLS.map((tool) => [
+  TOOL_NAMES.map((tool) => [
     `${tool}_total`,
-    { label: tool.charAt(0).toUpperCase() + tool.slice(1), color: TOOL_COLORS[tool] },
+    { label: toolLabel(tool), color: toolChartColor(tool) },
   ]),
 ) satisfies ChartConfig;
-
-function fmtTokens(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return (n / 1_000).toFixed(0) + "K";
-  return String(n);
-}
 
 function transformData(data: TokensDailyEntry[]) {
   return data.map((entry) => {
     const row: Record<string, string | number> = { date: entry.date };
-    for (const tool of TOOLS) {
+    for (const tool of TOOL_NAMES) {
       const t = entry.by_tool[tool];
       row[`${tool}_total`] = t ? t.input + t.output + t.thinking : 0;
     }
@@ -66,17 +53,17 @@ export function TokenTrendChart({ data }: { data: TokensDailyEntry[] }) {
             <YAxis
               tickLine={false}
               axisLine={false}
-              tickFormatter={(v: number) => fmtTokens(v)}
+              tickFormatter={(v: number) => fmtNum(v)}
             />
             <ChartTooltip
               content={
                 <ChartTooltipContent
-                  formatter={(value) => fmtTokens(value as number)}
+                  formatter={(value) => fmtNum(value as number)}
                 />
               }
             />
             <ChartLegend content={<ChartLegendContent />} />
-            {TOOLS.map((tool) => (
+            {TOOL_NAMES.map((tool) => (
               <Area
                 key={tool}
                 dataKey={`${tool}_total`}

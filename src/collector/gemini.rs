@@ -56,10 +56,16 @@ pub struct GeminiCollector {
 
 impl GeminiCollector {
     pub fn new() -> Self {
-        let home = dirs::home_dir().expect("cannot resolve home dir");
-        Self {
-            source: home.join(".gemini/tmp"),
-        }
+        Self::with_source(None)
+    }
+
+    pub fn with_source(source: Option<PathBuf>) -> Self {
+        let source = source.unwrap_or_else(|| {
+            dirs::home_dir()
+                .expect("cannot resolve home dir")
+                .join(".gemini/tmp")
+        });
+        Self { source }
     }
 }
 
@@ -158,6 +164,7 @@ fn parse_gemini_file(path: &PathBuf) -> Result<Session> {
     Ok(Session {
         id: raw.session_id,
         tool: Tool::Gemini,
+        hostname: None,
         project,
         model,
         start_time: raw.start_time,

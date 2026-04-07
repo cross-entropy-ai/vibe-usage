@@ -44,10 +44,16 @@ pub struct KimiCollector {
 
 impl KimiCollector {
     pub fn new() -> Self {
-        let home = dirs::home_dir().expect("cannot resolve home dir");
-        Self {
-            source: home.join(".kimi/sessions"),
-        }
+        Self::with_source(None)
+    }
+
+    pub fn with_source(source: Option<PathBuf>) -> Self {
+        let source = source.unwrap_or_else(|| {
+            dirs::home_dir()
+                .expect("cannot resolve home dir")
+                .join(".kimi/sessions")
+        });
+        Self { source }
     }
 }
 
@@ -210,6 +216,7 @@ fn parse_kimi_session(context_path: &PathBuf) -> Result<Option<Session>> {
     Ok(Some(Session {
         id: session_id,
         tool: Tool::Kimi,
+        hostname: None,
         project,
         model: None,
         start_time: mtime,

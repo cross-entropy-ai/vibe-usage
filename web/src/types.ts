@@ -1,4 +1,5 @@
-export type Tool = "gemini" | "claude" | "codex" | "kimi";
+import type { Tool } from "@/lib/tools";
+export type { Tool };
 export type Role = "user" | "assistant" | "system";
 
 export interface TokenUsage {

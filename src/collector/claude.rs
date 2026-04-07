@@ -50,10 +50,16 @@ pub struct ClaudeCollector {
 
 impl ClaudeCollector {
     pub fn new() -> Self {
-        let home = dirs::home_dir().expect("cannot resolve home dir");
-        Self {
-            source: home.join(".claude/projects"),
-        }
+        Self::with_source(None)
+    }
+
+    pub fn with_source(source: Option<PathBuf>) -> Self {
+        let source = source.unwrap_or_else(|| {
+            dirs::home_dir()
+                .expect("cannot resolve home dir")
+                .join(".claude/projects")
+        });
+        Self { source }
     }
 }
 
@@ -206,6 +212,7 @@ fn parse_claude_file(path: &PathBuf) -> Result<Option<Session>> {
     Ok(Some(Session {
         id: session_id,
         tool: Tool::Claude,
+        hostname: None,
         project,
         model: session_model,
         start_time: first_ts.unwrap(),

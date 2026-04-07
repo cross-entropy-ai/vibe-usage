@@ -3,13 +3,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { fmtNum } from "@/lib/formatters";
 import type { GitRepoStat } from "@/types";
-
-function fmtTokens(n: number) {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-  return n.toString();
-}
 
 function shortenRepo(repo: string) {
   return repo
@@ -19,8 +14,8 @@ function shortenRepo(repo: string) {
     .replace(/\.git$/, "");
 }
 
-export function GitActivity({ data }: { data: GitRepoStat[] }) {
-  const top = data.slice(0, 20);
+export function GitActivity({ data, limit = 20 }: { data: GitRepoStat[]; limit?: number }) {
+  const top = data.slice(0, limit);
 
   return (
     <Card>
@@ -54,8 +49,8 @@ export function GitActivity({ data }: { data: GitRepoStat[] }) {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right font-bold">{r.sessions}</TableCell>
-                <TableCell className="text-right">{fmtTokens(r.messages)}</TableCell>
-                <TableCell className="text-right">{fmtTokens(r.input_tokens + r.output_tokens)}</TableCell>
+                <TableCell className="text-right">{fmtNum(r.messages)}</TableCell>
+                <TableCell className="text-right">{fmtNum(r.input_tokens + r.output_tokens)}</TableCell>
                 <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap">
                   {r.last_seen}
                 </TableCell>

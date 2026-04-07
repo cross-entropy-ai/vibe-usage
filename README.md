@@ -11,7 +11,16 @@ Collects conversation data from multiple AI coding tools, maps them to a unified
 | OpenAI Codex | `~/.codex/sessions/YYYY/MM/DD/*.jsonl` | JSONL |
 | Kimi Code | `~/.kimi/sessions/<hash>/<uuid>/context.jsonl` | JSONL |
 
-## Build
+## Install
+
+```bash
+brew tap cross-entropy-ai/tap
+brew install vibe-usage
+```
+
+Or download pre-built binaries from [GitHub Releases](https://github.com/cross-entropy-ai/vibe-usage/releases).
+
+## Build from Source
 
 Requires Rust 1.80+ and Node.js 18+.
 
@@ -121,6 +130,18 @@ Raw files are copied incrementally (mtime-based skip). Multiple machines can pus
 | `GET /api/insights/languages` | Language + task classification |
 | `GET /api/insights/session-complexity` | Complexity by hour of day |
 
+## Release
+
+1. Update version in `Cargo.toml`
+2. Commit and tag:
+
+```bash
+git tag v0.x.0
+git push origin v0.x.0
+```
+
+GitHub Actions will automatically build all platforms, create a GitHub Release, and update the [Homebrew formula](https://github.com/cross-entropy-ai/homebrew-tap).
+
 ## Architecture
 
 ```
@@ -131,6 +152,14 @@ src/
 ├── remote.rs            # Push/pull via rsync
 ├── server.rs            # Axum HTTP server + API endpoints
 ├── insights.rs          # Deep analysis endpoints
+├── analytics/
+│   ├── mod.rs            # Shared helpers + re-exports
+│   ├── tokens.rs         # Token aggregation
+│   ├── summary.rs        # Overview stats
+│   ├── cost.rs           # Cost breakdown
+│   ├── activity.rs       # Duration, heatmap, latency, complexity
+│   ├── projects.rs       # Projects, directories, hosts, git, lifecycle
+│   └── insights.rs       # Cache, thinking, toolchains, languages, switches
 └── collector/
     ├── mod.rs            # Collector trait + incremental sync
     ├── gemini.rs         # Gemini JSON → Session

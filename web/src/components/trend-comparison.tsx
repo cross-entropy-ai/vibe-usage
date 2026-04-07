@@ -6,13 +6,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { fmtNum } from "@/lib/formatters";
 import type { DailyStat } from "@/types";
-
-function formatNumber(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-  return n.toString();
-}
 
 function ChangeBadge({ current, previous }: { current: number; previous: number }) {
   if (previous === 0 && current === 0) {
@@ -122,7 +117,7 @@ export function TrendComparison({ daily }: { daily: DailyStat[] }) {
               <p className="text-xs text-muted-foreground">{c.label}</p>
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-bold">
-                  {c.format ? formatNumber(c.current) : c.current}
+                  {c.format ? fmtNum(c.current) : c.current}
                 </span>
                 <ChangeBadge current={c.current} previous={c.previous} />
               </div>

@@ -21,27 +21,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { fmtMs, shortenModel } from "@/lib/formatters";
 import type { LatencyData } from "@/types";
 
 const config = {
   count: { label: "Messages", color: "var(--chart-2)" },
 } satisfies ChartConfig;
 
-function fmtMs(ms: number): string {
-  if (ms >= 1000) return (ms / 1000).toFixed(1) + "s";
-  return Math.round(ms) + "ms";
-}
-
-function shortenModel(name: string): string {
-  return name
-    .replace(/^models\//, "")
-    .replace(/-\d{8}$/, "")
-    .slice(0, 28);
-}
-
-export function LatencyChart({ data }: { data: LatencyData }) {
+export function LatencyChart({ data, modelLimit = 8 }: { data: LatencyData; modelLimit?: number }) {
   const { overall, by_model, histogram } = data;
-  const topModels = by_model.slice(0, 8);
+  const topModels = by_model.slice(0, modelLimit);
 
   return (
     <Card>

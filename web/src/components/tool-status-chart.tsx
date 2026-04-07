@@ -21,11 +21,11 @@ const config = {
   error: { label: "Error", color: "hsl(0 84% 60%)" },
 } satisfies ChartConfig;
 
-export function ToolStatusChart({ data }: { data: ToolStatusEntry[] }) {
+export function ToolStatusChart({ data, limit = 20 }: { data: ToolStatusEntry[]; limit?: number }) {
   const top = data
     .slice()
     .sort((a, b) => b.total - a.total)
-    .slice(0, 20)
+    .slice(0, limit)
     .map((d) => ({
       ...d,
       name: d.name.length > 20 ? d.name.slice(0, 20) + "\u2026" : d.name,

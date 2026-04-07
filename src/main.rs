@@ -1,6 +1,8 @@
+mod analytics;
 mod collector;
 mod insights;
 mod pricing;
+mod query;
 mod remote;
 mod schema;
 mod server;
@@ -10,10 +12,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-use collector::{
-    claude::ClaudeCollector, codex::CodexCollector, default_data_dir, gemini::GeminiCollector,
-    kimi::KimiCollector, raw_dirs_for, sync_collector, Collector,
-};
+use collector::{build_collectors, default_data_dir, raw_dirs_for, sync_collector, Collector};
 
 #[derive(Parser)]
 #[command(name = "vibe-usage", about = "Collect AI coding tool usage into a unified format")]
@@ -76,7 +75,9 @@ async fn main() -> Result<()> {
             remote::pull(&data_dir)?;
         }
         Some(Command::Serve { port }) => {
-            server::serve(collectors, data_dir, port).await?;
+            let pricing = Box::new(pricing::PricingConfig::load(&data_dir));
+            let state = query::AppState::new(collectors, data_dir, pricing);
+            server::serve(state, port).await?;
         }
         None => {
             // Default: sync then analyze --summary
@@ -88,30 +89,6 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
-}
-
-fn build_collectors(tools: &Option<Vec<String>>) -> Vec<Box<dyn Collector + Send + Sync>> {
-    let all_names = vec!["gemini", "claude", "codex", "kimi"];
-    let selected: Vec<&str> = match tools {
-        Some(ts) => ts.iter().map(|s| s.as_str()).collect(),
-        None => all_names,
-    };
-
-    selected
-        .iter()
-        .filter_map(|name| -> Option<Box<dyn Collector + Send + Sync>> {
-            match *name {
-                "gemini" => Some(Box::new(GeminiCollector::new())),
-                "claude" => Some(Box::new(ClaudeCollector::new())),
-                "codex" => Some(Box::new(CodexCollector::new())),
-                "kimi" => Some(Box::new(KimiCollector::new())),
-                other => {
-                    eprintln!("unknown tool: {other}");
-                    None
-                }
-            }
-        })
-        .collect()
 }
 
 fn do_sync(collectors: &[Box<dyn Collector + Send + Sync>], data_dir: &PathBuf) -> Result<()> {
@@ -164,66 +141,25 @@ fn output_sessions(
 }
 
 fn print_summary(sessions: &[schema::Session]) {
-    use schema::Tool;
+    let stats = analytics::summary(sessions);
 
-    let total = sessions.len();
-    let gemini = sessions.iter().filter(|s| s.tool == Tool::Gemini).count();
-    let claude = sessions.iter().filter(|s| s.tool == Tool::Claude).count();
-    let codex = sessions.iter().filter(|s| s.tool == Tool::Codex).count();
-    let kimi = sessions.iter().filter(|s| s.tool == Tool::Kimi).count();
-
-    let total_msgs: usize = sessions.iter().map(|s| s.messages.len()).sum();
-    let user_msgs: usize = sessions
-        .iter()
-        .flat_map(|s| &s.messages)
-        .filter(|m| m.role == schema::Role::User)
-        .count();
-    let assistant_msgs: usize = sessions
-        .iter()
-        .flat_map(|s| &s.messages)
-        .filter(|m| m.role == schema::Role::Assistant)
-        .count();
-
-    let total_input: u64 = sessions
-        .iter()
-        .flat_map(|s| &s.messages)
-        .filter_map(|m| m.tokens.as_ref())
-        .filter_map(|t| t.input)
-        .sum();
-    let total_output: u64 = sessions
-        .iter()
-        .flat_map(|s| &s.messages)
-        .filter_map(|m| m.tokens.as_ref())
-        .filter_map(|t| t.output)
-        .sum();
+    let tool_str = {
+        let mut parts: Vec<_> = stats.by_tool.iter().collect();
+        parts.sort_by_key(|(k, _)| k.as_str());
+        parts.iter().map(|(name, count)| format!("{name}: {count}")).collect::<Vec<_>>().join(", ")
+    };
 
     println!("=== Usage Summary ===");
-    println!("Sessions:  {total} (gemini: {gemini}, claude: {claude}, codex: {codex}, kimi: {kimi})");
-    println!("Messages:  {total_msgs} (user: {user_msgs}, assistant: {assistant_msgs})");
-    println!("Tokens:    input: {total_input}, output: {total_output}");
+    println!("Sessions:  {} ({tool_str})", stats.total_sessions);
+    println!("Messages:  {} (user: {}, assistant: {})", stats.messages.total, stats.messages.user, stats.messages.assistant);
+    println!("Tokens:    input: {}, output: {}", stats.tokens.input, stats.tokens.output);
 
-    if let (Some(first), Some(last)) = (sessions.first(), sessions.last()) {
-        println!(
-            "Period:    {} — {}",
-            first.start_time.format("%Y-%m-%d"),
-            last.start_time.format("%Y-%m-%d")
-        );
+    if let (Some(start), Some(end)) = (&stats.period.start, &stats.period.end) {
+        println!("Period:    {start} — {end}");
     }
-
-    let mut projects: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
-    for s in sessions {
-        let key = format!(
-            "[{}] {}",
-            s.tool,
-            s.project.as_deref().unwrap_or("(unknown)")
-        );
-        *projects.entry(key).or_default() += 1;
-    }
-    let mut projects: Vec<_> = projects.into_iter().collect();
-    projects.sort_by(|a, b| b.1.cmp(&a.1));
 
     println!("\nTop projects:");
-    for (name, count) in projects.iter().take(15) {
-        println!("  {count:>4}  {name}");
+    for p in stats.top_projects.iter().take(15) {
+        println!("  {:>4}  {}", p.sessions, p.name);
     }
 }

@@ -12,8 +12,8 @@ const config = {
   count: { label: "Calls", color: "var(--chart-2)" },
 } satisfies ChartConfig;
 
-export function ToolCallsChart({ data }: { data: ToolCallFreq[] }) {
-  const top = data.slice(0, 15);
+export function ToolCallsChart({ data, limit = 15 }: { data: ToolCallFreq[]; limit?: number }) {
+  const top = data.slice(0, limit);
 
   return (
     <Card>

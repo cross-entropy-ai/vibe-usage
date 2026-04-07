@@ -78,6 +78,8 @@ pub struct Session {
     pub id: String,
     pub tool: Tool,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub hostname: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub project: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,

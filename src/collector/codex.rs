@@ -59,10 +59,16 @@ pub struct CodexCollector {
 
 impl CodexCollector {
     pub fn new() -> Self {
-        let home = dirs::home_dir().expect("cannot resolve home dir");
-        Self {
-            source: home.join(".codex/sessions"),
-        }
+        Self::with_source(None)
+    }
+
+    pub fn with_source(source: Option<PathBuf>) -> Self {
+        let source = source.unwrap_or_else(|| {
+            dirs::home_dir()
+                .expect("cannot resolve home dir")
+                .join(".codex/sessions")
+        });
+        Self { source }
     }
 }
 
@@ -190,6 +196,7 @@ fn parse_codex_file(path: &PathBuf) -> Result<Option<Session>> {
     Ok(Some(Session {
         id: session_id,
         tool: Tool::Codex,
+        hostname: None,
         project: None,
         model,
         start_time: first_ts.unwrap(),

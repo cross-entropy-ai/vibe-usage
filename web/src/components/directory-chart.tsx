@@ -13,17 +13,12 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toolColor, sortedToolEntries } from "@/lib/utils";
+import { fmtNum } from "@/lib/formatters";
 import type { DirectoryStat } from "@/types";
 
 const config = {
   sessions: { label: "Sessions", color: "var(--chart-1)" },
 } satisfies ChartConfig;
-
-function fmtNum(n: number) {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-  return n.toString();
-}
 
 /** Keep the last 2 path segments and truncate to 25 chars. */
 function shortenDir(dir: string): string {
@@ -32,8 +27,8 @@ function shortenDir(dir: string): string {
   return short.length > 25 ? short.slice(0, 22) + "..." : short;
 }
 
-export function DirectoryChart({ data }: { data: DirectoryStat[] }) {
-  const top = data.slice(0, 15).map((d) => ({
+export function DirectoryChart({ data, limit = 15 }: { data: DirectoryStat[]; limit?: number }) {
+  const top = data.slice(0, limit).map((d) => ({
     ...d,
     shortDir: shortenDir(d.directory),
   }));
