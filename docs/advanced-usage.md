@@ -4,6 +4,16 @@ Use this guide if you want to sync data across machines through a central server
 
 By default, `vibe-usage` is local-first and reads/writes only your local data directory.
 
+If you do not want to use `~/.vibe-usage`, choose your own directory:
+
+```bash
+# one-off
+vibe-usage sync --data-dir ~/data/vibe
+
+# persistent default
+export VIBE_USAGE_DATA_DIR=~/data/vibe
+```
+
 ## Prerequisite
 
 Prepare a reachable server path, for example:
@@ -14,7 +24,7 @@ Prepare a reachable server path, for example:
 
 ## Step 1: configure `remote`
 
-Create or edit `~/.vibe-usage/config.toml` and set `remote`:
+Create or edit `<data-dir>/config.toml` and set `remote`:
 
 ```toml
 remote = "user@host:~/.vibe-usage"
@@ -51,15 +61,15 @@ On another machine with the same `remote` configured:
 vibe-usage pull
 ```
 
-This downloads data from `remote` into local `~/.vibe-usage`.
+This downloads data from `remote` into local `<data-dir>`.
 
 ## Command reference
 
-- `vibe-usage push`: local `~/.vibe-usage` -> `remote`
-- `vibe-usage pull`: `remote` -> local `~/.vibe-usage`
+- `vibe-usage push`: local `<data-dir>` -> `remote`
+- `vibe-usage pull`: `remote` -> local `<data-dir>`
 - Global flags:
   - `-t, --tools <gemini,claude,codex,kimi>`: filter tools (default: all)
-  - `-d, --data-dir <path>`: data directory (default: `~/.vibe-usage`)
+  - `-d, --data-dir <path>`: data directory (default: `~/.vibe-usage`; env: `VIBE_USAGE_DATA_DIR`)
 
 If `remote` is missing, `push`/`pull` cannot determine where to sync.
 
@@ -86,7 +96,7 @@ vibe-usage analyze -t claude --summary # specific tools only
 ## Data layout
 
 ```text
-~/.vibe-usage/
+<data-dir>/
 ├── config.toml
 └── raw/
     └── <hostname>/        # one dir per machine

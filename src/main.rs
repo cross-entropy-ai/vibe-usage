@@ -24,7 +24,7 @@ struct Cli {
     #[arg(short, long, value_delimiter = ',', global = true)]
     tools: Option<Vec<String>>,
 
-    /// Data directory (default: ~/.vibe-usage)
+    /// Data directory (default: ~/.vibe-usage, or $VIBE_USAGE_DATA_DIR)
     #[arg(short, long, global = true)]
     data_dir: Option<PathBuf>,
 
@@ -60,7 +60,7 @@ enum Command {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
-    let data_dir = cli.data_dir.unwrap_or_else(default_data_dir);
+    let data_dir = resolve_data_dir(cli.data_dir);
     let collectors = build_collectors(&cli.tools);
 
     match cli.command {
@@ -92,6 +92,16 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn resolve_data_dir(cli_data_dir: Option<PathBuf>) -> PathBuf {
+    if let Some(path) = cli_data_dir {
+        return path;
+    }
+    if let Some(path) = std::env::var_os("VIBE_USAGE_DATA_DIR") {
+        return PathBuf::from(path);
+    }
+    default_data_dir()
 }
 
 fn do_sync(collectors: &[Box<dyn Collector + Send + Sync>], data_dir: &PathBuf) -> Result<()> {
