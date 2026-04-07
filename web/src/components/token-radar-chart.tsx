@@ -19,14 +19,12 @@ export function TokenRadarChart({ tokens }: { tokens: TokenUsage }) {
     const input = tokens.input ?? 0;
     const output = tokens.output ?? 0;
     const thinking = tokens.thinking ?? 0;
-    const cache_read = tokens.cache_read ?? 0;
     const cache_write = tokens.cache_write ?? 0;
-    const max = Math.max(input, output, thinking, cache_read, cache_write, 1);
+    const max = Math.max(input, output, thinking, cache_write, 1);
     return [
       { category: "Input", value: input, pct: Math.round((input / max) * 100) },
       { category: "Output", value: output, pct: Math.round((output / max) * 100) },
       { category: "Thinking", value: thinking, pct: Math.round((thinking / max) * 100) },
-      { category: "Cache Read", value: cache_read, pct: Math.round((cache_read / max) * 100) },
       { category: "Cache Write", value: cache_write, pct: Math.round((cache_write / max) * 100) },
     ];
   }, [tokens]);
@@ -35,7 +33,7 @@ export function TokenRadarChart({ tokens }: { tokens: TokenUsage }) {
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Token Breakdown</CardTitle>
-        <CardDescription>Shape of token usage across categories</CardDescription>
+        <CardDescription>Shape of token usage without cache-read skew</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={radarConfig} className="h-[300px] w-full">

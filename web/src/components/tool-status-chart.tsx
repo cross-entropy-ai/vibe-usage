@@ -79,7 +79,7 @@ export function ToolStatusChart({ data, limit = 20 }: { data: ToolStatusEntry[];
               tickLine={false}
               axisLine={false}
             />
-            <XAxis type="number" scale="log" domain={[1, "auto"]} tickLine={false} axisLine={false} />
+            <XAxis type="number" tickLine={false} axisLine={false} />
             <ChartTooltip content={<ChartTooltipContent />} />
             <ChartLegend content={<ChartLegendContent />} />
             <Bar
@@ -87,12 +87,14 @@ export function ToolStatusChart({ data, limit = 20 }: { data: ToolStatusEntry[];
               stackId="status"
               fill="var(--color-success)"
               radius={[0, 0, 0, 0]}
+              minPointSize={2}
             />
             <Bar
               dataKey="error"
               stackId="status"
               fill="var(--color-error)"
               radius={[0, 4, 4, 0]}
+              minPointSize={2}
             />
           </BarChart>
         </ChartContainer>

@@ -70,6 +70,7 @@ export function LatencyChart({ data, modelLimit = 8 }: { data: LatencyData; mode
               dataKey="count"
               fill="var(--color-count)"
               radius={[4, 4, 0, 0]}
+              minPointSize={2}
             />
           </BarChart>
         </ChartContainer>

@@ -1,4 +1,5 @@
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid } from "recharts";
+import { useMemo } from "react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChartContainer,
@@ -10,42 +11,60 @@ import { fmtDate, fmtDuration } from "@/lib/formatters";
 import type { DurationData } from "@/types";
 
 const config = {
-  duration_min: { label: "Minutes", color: "var(--chart-5)" },
+  duration_log: { label: "Minutes", color: "var(--chart-5)" },
 } satisfies ChartConfig;
 
 export function DurationChart({ data }: { data: DurationData }) {
   const totalMin = data.daily.reduce((s, d) => s + d.duration_min, 0);
+  const chartData = useMemo(
+    () =>
+      data.daily.map((entry) => ({
+        ...entry,
+        duration_log: Math.log10((entry.duration_min ?? 0) + 1),
+      })),
+    [data.daily],
+  );
+  const tickValues = useMemo(() => {
+    const candidates = [1, 5, 15, 30, 60, 120, 240, 480, 960];
+    const maxDuration = Math.max(1, ...data.daily.map((entry) => entry.duration_min ?? 0));
+    return candidates
+      .filter((value) => value <= maxDuration)
+      .map((value) => Math.log10(value + 1));
+  }, [data.daily]);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Coding Duration</CardTitle>
         <CardDescription>
-          Daily session time &middot; {fmtDuration(totalMin)} total
+          Daily session time on a log scale &middot; {fmtDuration(totalMin)} total
         </CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={config} className="h-[300px] w-full">
-          <AreaChart data={data.daily} accessibilityLayer>
+          <BarChart data={chartData} accessibilityLayer barGap={6}>
             <CartesianGrid vertical={false} />
             <XAxis dataKey="date" tickFormatter={fmtDate} tickLine={false} axisLine={false} tickMargin={8} />
-            <YAxis tickFormatter={(v) => fmtDuration(v)} tickLine={false} axisLine={false} tickMargin={8} />
+            <YAxis
+              ticks={tickValues}
+              tickFormatter={(v) => fmtDuration(Math.max(0, Math.round(10 ** (v as number) - 1)))}
+              tickLine={false}
+              axisLine={false}
+              tickMargin={8}
+            />
             <ChartTooltip
               content={
                 <ChartTooltipContent
-                  formatter={(value) => fmtDuration(value as number)}
+                  formatter={(_value, _name, item) => fmtDuration(item.payload.duration_min as number)}
                 />
               }
             />
-            <Area
-              type="natural"
-              dataKey="duration_min"
-              stroke="var(--color-duration_min)"
-              fill="var(--color-duration_min)"
-              fillOpacity={0.2}
-              strokeWidth={2}
+            <Bar
+              dataKey="duration_log"
+              fill="var(--color-duration_log)"
+              radius={[4, 4, 0, 0]}
             />
-          </AreaChart>
+          </BarChart>
         </ChartContainer>
       </CardContent>
     </Card>

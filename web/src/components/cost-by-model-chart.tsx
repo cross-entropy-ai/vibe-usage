@@ -39,8 +39,6 @@ export function CostByModelChart({ data, limit = 10 }: { data: CostModelEntry[];
             />
             <XAxis
               type="number"
-              scale="log"
-              domain={[1, "auto"]}
               tickFormatter={(v: number) => fmtUsd(v)}
               tickLine={false}
               axisLine={false}
@@ -50,6 +48,7 @@ export function CostByModelChart({ data, limit = 10 }: { data: CostModelEntry[];
               dataKey="equivalent_api_cost_usd"
               fill="var(--color-equivalent_api_cost_usd)"
               radius={[0, 4, 4, 0]}
+              minPointSize={2}
             />
           </BarChart>
         </ChartContainer>

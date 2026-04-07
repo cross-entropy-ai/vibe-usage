@@ -1,4 +1,4 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChartContainer,
@@ -12,7 +12,6 @@ import { fmtNum } from "@/lib/formatters";
 import type { ModelTokens } from "@/types";
 
 const config = {
-  input_tokens: { label: "Input", color: "var(--chart-1)" },
   output_tokens: { label: "Output", color: "var(--chart-3)" },
   thinking_tokens: { label: "Thinking", color: "var(--chart-4)" },
 } satisfies ChartConfig;
@@ -40,20 +39,35 @@ export function ModelsChart({ data, limit = 12 }: { data: ModelTokens[]; limit?:
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Tokens by Model</CardTitle>
-        <CardDescription>Top models by token consumption</CardDescription>
+        <CardDescription>Top models by output and thinking tokens on a log scale</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={config} className="h-[350px] w-full">
-          <BarChart data={top} layout="vertical" accessibilityLayer margin={{ left: 20 }}>
+          <LineChart data={top} layout="vertical" accessibilityLayer margin={{ left: 20, right: 12 }}>
             <CartesianGrid horizontal={false} />
             <YAxis dataKey="model" type="category" width={140} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-            <XAxis type="number" tickFormatter={fmtNum} tickLine={false} axisLine={false} />
+            <XAxis type="number" scale="log" domain={[1, "auto"]} tickFormatter={fmtNum} tickLine={false} axisLine={false} />
             <ChartTooltip content={<ChartTooltipContent />} />
             <ChartLegend content={<ChartLegendContent />} />
-            <Bar dataKey="input_tokens" fill="var(--color-input_tokens)" radius={[0, 4, 4, 0]} stackId="t" />
-            <Bar dataKey="output_tokens" fill="var(--color-output_tokens)" radius={[0, 4, 4, 0]} stackId="t" />
-            <Bar dataKey="thinking_tokens" fill="var(--color-thinking_tokens)" radius={[0, 4, 4, 0]} stackId="t" />
-          </BarChart>
+            <Line
+              dataKey="output_tokens"
+              stroke="var(--color-output_tokens)"
+              strokeOpacity={0}
+              dot={{ r: 4, fill: "var(--color-output_tokens)", strokeWidth: 0 }}
+              activeDot={{ r: 5, fill: "var(--color-output_tokens)", strokeWidth: 0 }}
+              connectNulls={false}
+              isAnimationActive={false}
+            />
+            <Line
+              dataKey="thinking_tokens"
+              stroke="var(--color-thinking_tokens)"
+              strokeOpacity={0}
+              dot={{ r: 4, fill: "var(--color-thinking_tokens)", strokeWidth: 0 }}
+              activeDot={{ r: 5, fill: "var(--color-thinking_tokens)", strokeWidth: 0 }}
+              connectNulls={false}
+              isAnimationActive={false}
+            />
+          </LineChart>
         </ChartContainer>
       </CardContent>
     </Card>

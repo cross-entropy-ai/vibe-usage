@@ -28,6 +28,8 @@ export function ToolPieChart({ byTool, totalSessions }: ToolPieChartProps) {
         .map(([tool, sessions]) => ({ tool, sessions, fill: `var(--color-${tool})` })),
     [byTool],
   );
+  const visibleSessions = data.reduce((sum, entry) => sum + entry.sessions, 0);
+  const centerSessions = visibleSessions > 0 ? visibleSessions : totalSessions;
 
   return (
     <Card>
@@ -46,7 +48,7 @@ export function ToolPieChart({ byTool, totalSessions }: ToolPieChartProps) {
                     return (
                       <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
                         <tspan x={viewBox.cx} y={viewBox.cy} className="fill-foreground text-3xl font-bold">
-                          {totalSessions}
+                          {centerSessions}
                         </tspan>
                         <tspan x={viewBox.cx} y={(viewBox.cy ?? 0) + 24} className="fill-muted-foreground text-sm">
                           sessions

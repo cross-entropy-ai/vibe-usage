@@ -30,7 +30,7 @@ export function DailyCostChart({ data }: { data: CostDailyEntry[] }) {
               tickFormatter={(v: string) => v.slice(5)}
               tick={{ fontSize: 11 }}
             />
-            <YAxis scale="log" domain={[0.01, "auto"]} tickLine={false} axisLine={false} tickFormatter={(v: number) => "$" + v} />
+            <YAxis tickLine={false} axisLine={false} tickFormatter={(v: number) => "$" + v} />
             <ChartTooltip content={<ChartTooltipContent />} />
             <Area
               dataKey="equivalent_api_cost_usd"
@@ -38,6 +38,7 @@ export function DailyCostChart({ data }: { data: CostDailyEntry[] }) {
               fill="var(--color-equivalent_api_cost_usd)"
               fillOpacity={0.3}
               stroke="var(--color-equivalent_api_cost_usd)"
+              strokeWidth={2}
             />
           </AreaChart>
         </ChartContainer>

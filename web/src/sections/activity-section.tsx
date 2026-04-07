@@ -12,8 +12,12 @@ export function ActivitySection() {
   return (
     <>
       {activity?.languages && <Languages data={activity.languages} />}
-      {summary && <ActivityHeatmap daily={summary.daily} />}
-      {activity?.weekday && <WeekdayHeatmap data={activity.weekday} />}
+      {(summary || activity?.weekday) && (
+        <div className="grid gap-4 xl:grid-cols-2">
+          {summary && <ActivityHeatmap daily={summary.daily} />}
+          {activity?.weekday && <WeekdayHeatmap data={activity.weekday} />}
+        </div>
+      )}
       {activity?.sessionComplexity && <SessionComplexity data={activity.sessionComplexity} />}
       {activity?.conversations && <ConversationDepth data={activity.conversations} />}
     </>

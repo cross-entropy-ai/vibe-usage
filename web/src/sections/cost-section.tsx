@@ -1,6 +1,7 @@
 import { useSummary, useCost } from "@/lib/contexts";
 import { CumulativeChart } from "@/components/cumulative-chart";
 import { CostOverview } from "@/components/cost-overview";
+import { DailyCostChart } from "@/components/daily-cost-chart";
 import { TokenFlowChart } from "@/components/token-flow-chart";
 
 export function CostSection() {
@@ -10,7 +11,10 @@ export function CostSection() {
   return (
     <>
       {summary && cost && (
-        <CumulativeChart daily={summary.daily} costDaily={cost.daily} />
+        <div className="grid gap-4 md:grid-cols-2">
+          <CumulativeChart daily={summary.daily} costDaily={cost.daily} />
+          <DailyCostChart data={cost.daily} />
+        </div>
       )}
       {cost && <CostOverview data={cost} />}
       {cost && <TokenFlowChart data={cost.by_model} />}
