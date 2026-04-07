@@ -9,7 +9,26 @@ permissions:
   contents: write
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      exists: ${{ steps.check.outputs.exists }}
+    steps:
+      - name: Check if release already exists
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" &>/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Release ${{ github.ref_name }} already exists, skipping."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: check
+    if: needs.check.outputs.exists != 'true'
     strategy:
       matrix:
         include:
@@ -73,7 +92,8 @@ jobs:
           path: "*.tar.gz"
 
   release:
-    needs: build
+    needs: [check, build]
+    if: needs.check.outputs.exists != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
@@ -88,7 +108,8 @@ jobs:
           files: "*.tar.gz"
 
   homebrew:
-    needs: release
+    needs: [check, release]
+    if: needs.check.outputs.exists != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
