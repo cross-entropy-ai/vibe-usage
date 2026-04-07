@@ -1,18 +1,31 @@
-# vibe-usage
+<h1>
+  <img src="./docs/pics/logo.png" alt="Organization Logo" width="28" style="vertical-align: middle;" />
+  vibe-usage
+</h1>
 
-Collects conversation data from multiple AI coding tools, maps them to a unified schema, and serves a web dashboard for analysis.
+[![Release](https://img.shields.io/github/v/release/cross-entropy-ai/vibe-usage?color=8b5cf6)](https://github.com/cross-entropy-ai/vibe-usage/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/cross-entropy-ai/vibe-usage/release.yml?label=build&color=22c55e)](https://github.com/cross-entropy-ai/vibe-usage/actions/workflows/release.yml)
+[![Downloads](https://img.shields.io/github/downloads/cross-entropy-ai/vibe-usage/total?color=0ea5e9)](https://github.com/cross-entropy-ai/vibe-usage/releases)
 
-Single binary, written by Rust.
+**Local-first** usage analytics for AI coding tools.
+
+Single binary, written in **Rust**.
+
+Sync local raw data, then explore **rich stats** in the dashboard (**usage**, **cost**, **projects**, **activity**, and more).
+
+Supports Gemini CLI, Claude Code, OpenAI Codex, and Kimi Code.
 
 ## Screenshots
 
-![Dashboard](./docs/dashboard.png)
+![Dashboard](./docs/pics/dashboard.png)
 
 <p align="center">
-  <img src="./docs/usage-snapshot.png" alt="Usage Snapshot" width="24%" />
-  <img src="./docs/cost.png" alt="Cost Pressure and Savings" width="24%" />
-  <img src="./docs/projects.png" alt="Projects and Host Coverage" width="24%" />
-  <img src="./docs/activity.png" alt="Activity and Conversation Insights" width="24%" />
+  <img src="./docs/pics/usage-snapshot.png" alt="Usage Snapshot" width="48%" />
+  <img src="./docs/pics/cost.png" alt="Cost Pressure and Savings" width="48%" />
+</p>
+<p align="center">
+  <img src="./docs/pics/projects.png" alt="Projects and Host Coverage" width="48%" />
+  <img src="./docs/pics/activity.png" alt="Activity and Conversation Insights" width="48%" />
 </p>
 
 ## Install
@@ -24,82 +37,24 @@ brew install vibe-usage
 
 Or download pre-built binaries from [GitHub Releases](https://github.com/cross-entropy-ai/vibe-usage/releases).
 
-## Supported Tools
-
-| Tool | Data Location | Format |
-|------|--------------|--------|
-| Gemini CLI | `~/.gemini/tmp/<project>/chats/*.json` | JSON |
-| Claude Code | `~/.claude/projects/<project>/*.jsonl` | JSONL |
-| OpenAI Codex | `~/.codex/sessions/YYYY/MM/DD/*.jsonl` | JSONL |
-| Kimi Code | `~/.kimi/sessions/<hash>/<uuid>/context.jsonl` | JSONL |
-
-## Build from Source
-
-See [`docs/build-from-source.md`](docs/build-from-source.md).
+Need to build from source? See [`docs/build-from-source.md`](docs/build-from-source.md).
 
 ## Usage
 
-```bash
-# Default: sync local data + print summary
-vibe-usage
+After install, use **`sync`** to collect local data and **`serve`** to view local-first stats in the dashboard.
 
-# Subcommands
+```bash
 vibe-usage sync                        # copy raw files to ~/.vibe-usage/raw/<hostname>/
-vibe-usage analyze --summary           # parse from local copy, print stats
-vibe-usage analyze -o all.json         # export full JSON
-vibe-usage analyze -t claude --summary # specific tools only
 vibe-usage serve                       # start web dashboard on :3000
 vibe-usage serve -p 8080               # custom port
-vibe-usage push                        # rsync local data to remote server
-vibe-usage pull                        # rsync all data from remote server
-
-# Global flags
--t, --tools <gemini,claude,codex,kimi> # filter tools (default: all)
--d, --data-dir <path>                  # data directory (default: ~/.vibe-usage)
 ```
 
-## Configuration
+By default, `vibe-usage` is **local-first** and reads/writes only your local data directory.
 
-`~/.vibe-usage/config.toml`:
+For `analyze`, `push`, `pull`, and other **advanced setup**, see [`docs/advanced-usage.md`](docs/advanced-usage.md).
 
-```toml
-remote = "user@host:~/.vibe-usage"
+## Others
 
-# Subscription-based tools (flat monthly, not per-token)
-[[subscriptions]]
-tool = "claude"
-plan = "Team"
-monthly_usd = 30.0
-
-[[subscriptions]]
-tool = "codex"
-plan = "Plus"
-monthly_usd = 20.0
-```
-
-## Data Layout
-
-```
-~/.vibe-usage/
-├── config.toml
-└── raw/
-    └── <hostname>/        # one dir per machine
-        ├── gemini/        # raw copies from each tool
-        ├── claude/
-        ├── codex/
-        └── kimi/
-```
-
-Raw files are copied incrementally (mtime-based skip). Multiple machines can push to the same remote, each under their own hostname directory.
-
-## Web Dashboard
-
-See [`docs/web-dashboard.md`](docs/web-dashboard.md).
-
-## Release
-
-See [`docs/release.md`](docs/release.md).
-
-## Architecture
-
-See [`docs/architecture.md`](docs/architecture.md).
+- [`docs/web-dashboard.md`](docs/web-dashboard.md)
+- [`docs/release.md`](docs/release.md)
+- [`docs/architecture.md`](docs/architecture.md)

@@ -4,3 +4,5 @@
 /web/dist
 /web/.git
 .gemini
+.cursor
+.codex
