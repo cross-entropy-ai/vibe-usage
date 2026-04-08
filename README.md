@@ -15,12 +15,9 @@ Local-first usage analytics for AI coding tools.
 ![Dashboard](./docs/pics/dashboard.png)
 
 <p align="center">
-  <img src="./docs/pics/usage-snapshot.png" alt="Usage snapshot" width="48%" />
-  <img src="./docs/pics/cost.png" alt="Cost insights" width="48%" />
-</p>
-<p align="center">
-  <img src="./docs/pics/projects.png" alt="Projects and hosts" width="48%" />
-  <img src="./docs/pics/activity.png" alt="Activity insights" width="48%" />
+  <img src="./docs/pics/usage-snapshot.png" alt="Usage snapshot" width="32%" />
+  <img src="./docs/pics/cost.png" alt="Cost insights" width="32%" />
+  <img src="./docs/pics/activity.png" alt="Activity insights" width="32%" />
 </p>
 
 ## Install
