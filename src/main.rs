@@ -6,6 +6,7 @@ mod query;
 mod remote;
 mod schema;
 mod server;
+mod agent;
 
 use std::path::PathBuf;
 
