@@ -69,26 +69,29 @@ async fn main() -> Result<()> {
             do_sync(&collectors, &data_dir)?;
         }
         Some(Command::Analyze { output, summary }) => {
+            do_sync(&collectors, &data_dir)?;
             let sessions = do_parse(&collectors, &data_dir)?;
             output_sessions(&sessions, output, summary)?;
         }
         Some(Command::Push) => {
+            do_sync(&collectors, &data_dir)?;
             remote::push(&data_dir)?;
         }
         Some(Command::Pull) => {
             remote::pull(&data_dir)?;
         }
         Some(Command::Serve { port }) => {
+            do_sync(&collectors, &data_dir)?;
             let pricing = Box::new(pricing::PricingConfig::load(&data_dir));
             let state = query::AppState::new(collectors, data_dir, pricing);
             server::serve(state, port).await?;
         }
         None => {
-            // Default: sync then analyze --summary
+            // Default: sync then serve on port 3000
             do_sync(&collectors, &data_dir)?;
-            eprintln!();
-            let sessions = do_parse(&collectors, &data_dir)?;
-            output_sessions(&sessions, None, true)?;
+            let pricing = Box::new(pricing::PricingConfig::load(&data_dir));
+            let state = query::AppState::new(collectors, data_dir, pricing);
+            server::serve(state, 3000).await?;
         }
     }
 
