@@ -55,6 +55,9 @@ enum Command {
         /// Port to listen on (default: 3000)
         #[arg(short, long, default_value = "3000")]
         port: u16,
+        /// Host address to bind to (default: 0.0.0.0)
+        #[arg(long, default_value = "0.0.0.0")]
+        host: String,
     },
 }
 
@@ -80,18 +83,18 @@ async fn main() -> Result<()> {
         Some(Command::Pull) => {
             remote::pull(&data_dir)?;
         }
-        Some(Command::Serve { port }) => {
+        Some(Command::Serve { port, host }) => {
             do_sync(&collectors, &data_dir)?;
             let pricing = Box::new(pricing::PricingConfig::load(&data_dir));
             let state = query::AppState::new(collectors, data_dir, pricing);
-            server::serve(state, port).await?;
+            server::serve(state, &host, port).await?;
         }
         None => {
             // Default: sync then serve on port 3000
             do_sync(&collectors, &data_dir)?;
             let pricing = Box::new(pricing::PricingConfig::load(&data_dir));
             let state = query::AppState::new(collectors, data_dir, pricing);
-            server::serve(state, 3000).await?;
+            server::serve(state, "0.0.0.0", 3000).await?;
         }
     }
 

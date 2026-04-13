@@ -124,7 +124,7 @@ async fn static_handler(uri: Uri) -> Response {
     }
 }
 
-pub async fn serve(state: AppState, port: u16) -> anyhow::Result<()> {
+pub async fn serve(state: AppState, host: &str, port: u16) -> anyhow::Result<()> {
     let state = Arc::new(state);
     let app = Router::new()
         .route("/api/sessions", get(api_sessions))
@@ -146,9 +146,26 @@ pub async fn serve(state: AppState, port: u16) -> anyhow::Result<()> {
         .fallback(static_handler)
         .with_state(state);
 
-    let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
-    eprintln!("Dashboard: http://localhost:{port}");
+    let ip: std::net::IpAddr = host.parse()?;
+    let addr = std::net::SocketAddr::from((ip, port));
     let listener = tokio::net::TcpListener::bind(addr).await?;
+
+    eprintln!("Listening on {addr}");
+    if ip.is_unspecified() {
+        eprintln!("  http://localhost:{port}");
+        if let Some(ip) = local_ip() {
+            eprintln!("  http://{ip}:{port}");
+        }
+    } else {
+        eprintln!("  http://{addr}");
+    }
+
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+fn local_ip() -> Option<std::net::IpAddr> {
+    let socket = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
+    socket.connect("8.8.8.8:80").ok()?;
+    Some(socket.local_addr().ok()?.ip())
 }
