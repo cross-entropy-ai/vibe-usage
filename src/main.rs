@@ -18,7 +18,7 @@ use collector::{Collector, build_collectors, default_data_dir, raw_dirs_for, syn
 #[derive(Parser)]
 #[command(
     name = "vibe-usage",
-    about = "Collect AI coding tool usage into a unified format"
+    about = "Local-first usage analytics for AI coding tools.\n\nRun without subcommands to sync data and open the dashboard in your browser."
 )]
 struct Cli {
     /// Which tools to operate on (gemini, claude, codex, kimi). Omit for all.
@@ -50,14 +50,17 @@ enum Command {
     Push,
     /// Pull all raw data from remote server
     Pull,
-    /// Start web dashboard server
+    /// Start web dashboard (syncs data first, opens browser automatically)
     Serve {
-        /// Port to listen on (default: 3000)
+        /// Port to listen on (auto-finds available port if busy)
         #[arg(short, long, default_value = "3000")]
         port: u16,
-        /// Host address to bind to (default: 0.0.0.0)
+        /// Host address to bind to
         #[arg(long, default_value = "0.0.0.0")]
         host: String,
+        /// Don't open browser automatically
+        #[arg(long)]
+        no_browser: bool,
     },
 }
 
@@ -83,18 +86,18 @@ async fn main() -> Result<()> {
         Some(Command::Pull) => {
             remote::pull(&data_dir)?;
         }
-        Some(Command::Serve { port, host }) => {
+        Some(Command::Serve { port, host, no_browser }) => {
             do_sync(&collectors, &data_dir)?;
             let pricing = Box::new(pricing::PricingConfig::load(&data_dir));
             let state = query::AppState::new(collectors, data_dir, pricing);
-            server::serve(state, &host, port).await?;
+            server::serve(state, &host, port, !no_browser).await?;
         }
         None => {
-            // Default: sync then serve on port 3000
+            // Default: sync then serve
             do_sync(&collectors, &data_dir)?;
             let pricing = Box::new(pricing::PricingConfig::load(&data_dir));
             let state = query::AppState::new(collectors, data_dir, pricing);
-            server::serve(state, "0.0.0.0", 3000).await?;
+            server::serve(state, "0.0.0.0", 3000, true).await?;
         }
     }
 

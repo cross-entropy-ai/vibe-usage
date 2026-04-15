@@ -34,9 +34,11 @@ Build from source: [docs/build-from-source.md](docs/build-from-source.md)
 ## Quick Start
 
 ```bash
-vibe-usage sync          # collect local raw files
-vibe-usage serve         # open dashboard on :3000
-vibe-usage serve -p 8080 # custom port
+vibe-usage                        # sync + open dashboard (auto-finds port, opens browser)
+vibe-usage serve                  # same as above
+vibe-usage serve -p 8080          # use specific port (falls back to auto if busy)
+vibe-usage serve --no-browser     # don't open browser automatically
+vibe-usage sync                   # collect local raw files only
 ```
 
 ## Data Directory

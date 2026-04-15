@@ -124,7 +124,7 @@ async fn static_handler(uri: Uri) -> Response {
     }
 }
 
-pub async fn serve(state: AppState, host: &str, port: u16) -> anyhow::Result<()> {
+pub async fn serve(state: AppState, host: &str, port: u16, open_browser: bool) -> anyhow::Result<()> {
     let state = Arc::new(state);
     let app = Router::new()
         .route("/api/sessions", get(api_sessions))
@@ -148,16 +148,36 @@ pub async fn serve(state: AppState, host: &str, port: u16) -> anyhow::Result<()>
 
     let ip: std::net::IpAddr = host.parse()?;
     let addr = std::net::SocketAddr::from((ip, port));
-    let listener = tokio::net::TcpListener::bind(addr).await?;
 
-    eprintln!("Listening on {addr}");
-    if ip.is_unspecified() {
-        eprintln!("  http://localhost:{port}");
-        if let Some(ip) = local_ip() {
-            eprintln!("  http://{ip}:{port}");
+    // Try requested port first, fall back to OS-assigned port if busy
+    let listener = match tokio::net::TcpListener::bind(addr).await {
+        Ok(l) => l,
+        Err(_) => {
+            let fallback = std::net::SocketAddr::from((ip, 0u16));
+            eprintln!("Port {port} is busy, finding an available port...");
+            tokio::net::TcpListener::bind(fallback).await?
         }
+    };
+
+    let actual_addr = listener.local_addr()?;
+    let actual_port = actual_addr.port();
+
+    eprintln!("Listening on {actual_addr}");
+    let url = if ip.is_unspecified() {
+        eprintln!("  http://localhost:{actual_port}");
+        if let Some(lip) = local_ip() {
+            eprintln!("  http://{lip}:{actual_port}");
+        }
+        format!("http://localhost:{actual_port}")
     } else {
-        eprintln!("  http://{addr}");
+        eprintln!("  http://{actual_addr}");
+        format!("http://{actual_addr}")
+    };
+
+    if open_browser {
+        if let Err(e) = open::that(&url) {
+            eprintln!("Could not open browser: {e}");
+        }
     }
 
     axum::serve(listener, app).await?;
