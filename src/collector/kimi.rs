@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
-use super::Collector;
+use super::{Collector, ParseResult};
 use crate::schema::*;
 
 // ── Raw Kimi JSONL schema ───────────────────────────────────────────
@@ -70,21 +70,28 @@ impl Collector for KimiCollector {
         vec!["*/*/context.jsonl", "*/*/metadata.json"]
     }
 
-    fn parse(&self, raw_dir: &Path) -> Result<Vec<Session>> {
+    fn parse(&self, raw_dir: &Path) -> Result<ParseResult> {
         let pattern = raw_dir.join("*/*/context.jsonl");
         let pattern = pattern.to_string_lossy();
 
         let mut sessions = Vec::new();
+        let mut warnings = Vec::new();
         for entry in glob::glob(&pattern)? {
-            let path = entry?;
+            let path = match entry {
+                Ok(p) => p,
+                Err(e) => {
+                    warnings.push(format!("kimi: glob entry: {e}"));
+                    continue;
+                }
+            };
             match parse_kimi_session(&path) {
                 Ok(Some(s)) => sessions.push(s),
                 Ok(None) => {}
-                Err(e) => eprintln!("warn: skipping {}: {e}", path.display()),
+                Err(e) => warnings.push(format!("kimi: {}: {e}", path.display())),
             }
         }
         sessions.sort_by_key(|s| s.start_time);
-        Ok(sessions)
+        Ok(ParseResult { sessions, warnings })
     }
 }
 

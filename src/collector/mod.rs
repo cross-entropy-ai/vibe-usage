@@ -6,9 +6,15 @@ pub mod kimi;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 use crate::schema::Session;
+
+/// Result of parsing a raw directory: sessions + any non-fatal warnings.
+pub struct ParseResult {
+    pub sessions: Vec<Session>,
+    pub warnings: Vec<String>,
+}
 
 /// Every collector implements this trait.
 pub trait Collector: Send + Sync {
@@ -23,12 +29,14 @@ pub trait Collector: Send + Sync {
 
     /// Parse sessions from the local raw copy at `raw_dir`.
     /// `raw_dir` is `<data_dir>/raw/<hostname>/<name>/`.
-    fn parse(&self, raw_dir: &Path) -> Result<Vec<Session>>;
+    /// Individual file errors are captured as warnings instead of aborting.
+    fn parse(&self, raw_dir: &Path) -> Result<ParseResult>;
 }
 
 pub struct SyncStats {
     pub copied: usize,
     pub skipped: usize,
+    pub errors: Vec<String>,
 }
 
 /// Get the local hostname.
@@ -48,34 +56,56 @@ pub fn sync_collector(collector: &dyn Collector, data_dir: &Path) -> Result<Sync
 
     let mut copied = 0usize;
     let mut skipped = 0usize;
+    let mut errors = Vec::new();
 
     for pattern in collector.glob_patterns() {
         let full_pattern = source.join(pattern);
         let full_pattern = full_pattern.to_string_lossy();
 
         for entry in glob::glob(&full_pattern)? {
-            let src_path = entry?;
+            let src_path = match entry {
+                Ok(p) => p,
+                Err(e) => {
+                    errors.push(format!("glob entry: {e}"));
+                    continue;
+                }
+            };
 
-            let rel = src_path
-                .strip_prefix(source)
-                .context("strip source prefix")?;
+            let rel = match src_path.strip_prefix(source) {
+                Ok(r) => r.to_path_buf(),
+                Err(e) => {
+                    errors.push(format!("{}: {e}", src_path.display()));
+                    continue;
+                }
+            };
             let dest_path = raw_dir.join(rel);
 
             let needs_copy = match fs::metadata(&dest_path) {
-                Ok(dest_meta) => {
-                    let src_meta = fs::metadata(&src_path)?;
-                    let src_mtime = src_meta.modified()?;
-                    let dest_mtime = dest_meta.modified()?;
-                    src_mtime > dest_mtime
-                }
+                Ok(dest_meta) => match fs::metadata(&src_path) {
+                    Ok(src_meta) => {
+                        let src_mtime = src_meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                        let dest_mtime = dest_meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                        src_mtime > dest_mtime
+                    }
+                    Err(e) => {
+                        errors.push(format!("{}: {e}", src_path.display()));
+                        continue;
+                    }
+                },
                 Err(_) => true,
             };
 
             if needs_copy {
                 if let Some(parent) = dest_path.parent() {
-                    fs::create_dir_all(parent)?;
+                    if let Err(e) = fs::create_dir_all(parent) {
+                        errors.push(format!("{}: mkdir: {e}", dest_path.display()));
+                        continue;
+                    }
                 }
-                fs::copy(&src_path, &dest_path)?;
+                if let Err(e) = fs::copy(&src_path, &dest_path) {
+                    errors.push(format!("{}: copy: {e}", src_path.display()));
+                    continue;
+                }
                 copied += 1;
             } else {
                 skipped += 1;
@@ -83,7 +113,7 @@ pub fn sync_collector(collector: &dyn Collector, data_dir: &Path) -> Result<Sync
         }
     }
 
-    Ok(SyncStats { copied, skipped })
+    Ok(SyncStats { copied, skipped, errors })
 }
 
 /// Build the raw_dir path for a given collector (for parsing).

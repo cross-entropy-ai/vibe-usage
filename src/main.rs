@@ -6,6 +6,7 @@ mod query;
 mod remote;
 mod schema;
 mod server;
+#[allow(dead_code)]
 mod agent;
 
 use std::path::PathBuf;
@@ -118,7 +119,17 @@ fn do_sync(collectors: &[Box<dyn Collector + Send + Sync>], data_dir: &PathBuf) 
     for c in collectors {
         eprint!("syncing {}...", c.name());
         match sync_collector(c.as_ref(), data_dir) {
-            Ok(stats) => eprintln!(" {} copied, {} up-to-date", stats.copied, stats.skipped),
+            Ok(stats) => {
+                eprint!(" {} copied, {} up-to-date", stats.copied, stats.skipped);
+                if stats.errors.is_empty() {
+                    eprintln!();
+                } else {
+                    eprintln!(", {} failed", stats.errors.len());
+                    for e in &stats.errors {
+                        eprintln!("  warn: {e}");
+                    }
+                }
+            }
             Err(e) => eprintln!(" error: {e}"),
         }
     }
@@ -134,16 +145,26 @@ fn do_parse(
         let dirs = raw_dirs_for(c.as_ref(), data_dir);
         eprint!("parsing {}...", c.name());
         let mut count = 0;
+        let mut all_warnings = Vec::new();
         for raw_dir in dirs {
             match c.parse(&raw_dir) {
-                Ok(sessions) => {
-                    count += sessions.len();
-                    all_sessions.extend(sessions);
+                Ok(result) => {
+                    count += result.sessions.len();
+                    all_warnings.extend(result.warnings);
+                    all_sessions.extend(result.sessions);
                 }
                 Err(e) => eprintln!(" error in {}: {e}", raw_dir.display()),
             }
         }
-        eprintln!(" {} sessions", count);
+        eprint!(" {} sessions", count);
+        if all_warnings.is_empty() {
+            eprintln!();
+        } else {
+            eprintln!(", {} skipped", all_warnings.len());
+            for w in &all_warnings {
+                eprintln!("  warn: {w}");
+            }
+        }
     }
     all_sessions.sort_by_key(|s| s.start_time);
     Ok(all_sessions)

@@ -1,6 +1,9 @@
+use std::fs;
 use std::path::PathBuf;
-use std::time::Instant;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
+use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Deserialize;
 use tokio::sync::RwLock;
 
@@ -8,18 +11,14 @@ use crate::collector::{Collector, raw_dirs_for};
 use crate::pricing::PricingProvider;
 use crate::schema::Session;
 
-const CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(30);
-
-struct SessionCache {
-    sessions: Vec<Session>,
-    updated_at: Instant,
-}
-
 pub struct AppState {
     pub collectors: Vec<Box<dyn Collector + Send + Sync>>,
     pub data_dir: PathBuf,
     pub pricing: Box<dyn PricingProvider>,
-    cache: RwLock<Option<SessionCache>>,
+    cache: RwLock<Option<Vec<Session>>>,
+    dirty: Arc<AtomicBool>,
+    has_watcher: bool,
+    _watcher: Option<RecommendedWatcher>,
 }
 
 impl AppState {
@@ -28,11 +27,36 @@ impl AppState {
         data_dir: PathBuf,
         pricing: Box<dyn PricingProvider>,
     ) -> Self {
+        let dirty = Arc::new(AtomicBool::new(true));
+        let raw_dir = data_dir.join("raw");
+        let _ = fs::create_dir_all(&raw_dir);
+
+        let watcher = {
+            let flag = dirty.clone();
+            notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
+                if res.is_ok() {
+                    flag.store(true, Ordering::Release);
+                }
+            })
+            .and_then(|mut w| {
+                w.watch(&raw_dir, RecursiveMode::Recursive)?;
+                Ok(w)
+            })
+        };
+
+        let has_watcher = watcher.is_ok();
+        if !has_watcher {
+            eprintln!("warn: fs watcher unavailable, cache will re-parse on every request");
+        }
+
         Self {
             collectors,
             data_dir,
             pricing,
             cache: RwLock::new(None),
+            dirty,
+            has_watcher,
+            _watcher: watcher.ok(),
         }
     }
 }
@@ -45,11 +69,20 @@ fn parse_sessions(state: &AppState) -> Vec<Session> {
                 .parent()
                 .and_then(|p| p.file_name())
                 .map(|n| n.to_string_lossy().to_string());
-            if let Ok(mut sessions) = c.parse(&raw_dir) {
-                for s in &mut sessions {
-                    s.hostname = host.clone();
+            match c.parse(&raw_dir) {
+                Ok(result) => {
+                    for w in &result.warnings {
+                        eprintln!("warn: {w}");
+                    }
+                    let mut sessions = result.sessions;
+                    for s in &mut sessions {
+                        s.hostname = host.clone();
+                    }
+                    all.extend(sessions);
                 }
-                all.extend(sessions);
+                Err(e) => {
+                    eprintln!("error: {} parse {}: {e}", c.name(), raw_dir.display());
+                }
             }
         }
     }
@@ -58,25 +91,30 @@ fn parse_sessions(state: &AppState) -> Vec<Session> {
 }
 
 pub async fn collect_sessions(state: &AppState) -> Vec<Session> {
-    {
+    // Fast path: not dirty, return cache if available
+    if !state.dirty.load(Ordering::Acquire) {
         let cache = state.cache.read().await;
-        if let Some(ref c) = *cache {
-            if c.updated_at.elapsed() < CACHE_TTL {
-                return c.sessions.clone();
-            }
+        if let Some(ref sessions) = *cache {
+            return sessions.clone();
         }
     }
+
+    // Slow path: acquire write lock, double-check
     let mut cache = state.cache.write().await;
-    if let Some(ref c) = *cache {
-        if c.updated_at.elapsed() < CACHE_TTL {
-            return c.sessions.clone();
+    if !state.dirty.load(Ordering::Acquire) {
+        if let Some(ref sessions) = *cache {
+            return sessions.clone();
         }
     }
+
+    // Clear dirty before parsing — changes during parse will re-set it.
+    // If watcher is absent, leave dirty=true so we always re-parse.
+    if state.has_watcher {
+        state.dirty.store(false, Ordering::Release);
+    }
+
     let sessions = parse_sessions(state);
-    *cache = Some(SessionCache {
-        sessions: sessions.clone(),
-        updated_at: Instant::now(),
-    });
+    *cache = Some(sessions.clone());
     sessions
 }
 
