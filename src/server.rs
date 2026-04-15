@@ -11,7 +11,7 @@ use rust_embed::Embed;
 use tower_http::cors::CorsLayer;
 
 use crate::analytics;
-use crate::query::{AppState, SessionFilter, collect_sessions, filter_sessions, paginate};
+use crate::query::{AppState, DateRange, SessionFilter, collect_sessions, filter_by_date, filter_sessions, paginate};
 
 #[derive(Embed)]
 #[folder = "web/dist"]
@@ -32,70 +32,70 @@ async fn api_sessions(
     }))
 }
 
-async fn api_summary(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
-    let sessions = collect_sessions(&state).await;
+async fn api_summary(State(state): State<Arc<AppState>>, Query(r): Query<DateRange>) -> Json<serde_json::Value> {
+    let sessions = filter_by_date(collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::summary(&sessions)).unwrap())
 }
 
-async fn api_tokens_daily(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
-    let sessions = collect_sessions(&state).await;
+async fn api_tokens_daily(State(state): State<Arc<AppState>>, Query(r): Query<DateRange>) -> Json<serde_json::Value> {
+    let sessions = filter_by_date(collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::daily_tokens(&sessions)).unwrap())
 }
 
-async fn api_tokens_by_model(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
-    let sessions = collect_sessions(&state).await;
+async fn api_tokens_by_model(State(state): State<Arc<AppState>>, Query(r): Query<DateRange>) -> Json<serde_json::Value> {
+    let sessions = filter_by_date(collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::tokens_by_model(&sessions)).unwrap())
 }
 
-async fn api_tools_usage(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
-    let sessions = collect_sessions(&state).await;
+async fn api_tools_usage(State(state): State<Arc<AppState>>, Query(r): Query<DateRange>) -> Json<serde_json::Value> {
+    let sessions = filter_by_date(collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::tools_usage(&sessions)).unwrap())
 }
 
-async fn api_projects(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
-    let sessions = collect_sessions(&state).await;
+async fn api_projects(State(state): State<Arc<AppState>>, Query(r): Query<DateRange>) -> Json<serde_json::Value> {
+    let sessions = filter_by_date(collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::projects(&sessions)).unwrap())
 }
 
-async fn api_hosts(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
-    let sessions = collect_sessions(&state).await;
+async fn api_hosts(State(state): State<Arc<AppState>>, Query(r): Query<DateRange>) -> Json<serde_json::Value> {
+    let sessions = filter_by_date(collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::hosts_summary(&sessions)).unwrap())
 }
 
-async fn api_duration(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
-    let sessions = collect_sessions(&state).await;
+async fn api_duration(State(state): State<Arc<AppState>>, Query(r): Query<DateRange>) -> Json<serde_json::Value> {
+    let sessions = filter_by_date(collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::duration(&sessions)).unwrap())
 }
 
-async fn api_activity_heatmap(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
-    let sessions = collect_sessions(&state).await;
+async fn api_activity_heatmap(State(state): State<Arc<AppState>>, Query(r): Query<DateRange>) -> Json<serde_json::Value> {
+    let sessions = filter_by_date(collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::activity_heatmap(&sessions)).unwrap())
 }
 
-async fn api_cost(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
-    let sessions = collect_sessions(&state).await;
+async fn api_cost(State(state): State<Arc<AppState>>, Query(r): Query<DateRange>) -> Json<serde_json::Value> {
+    let sessions = filter_by_date(collect_sessions(&state).await, &r);
     Json(
         serde_json::to_value(analytics::cost_breakdown(&sessions, state.pricing.as_ref())).unwrap(),
     )
 }
 
-async fn api_messages_latency(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
-    let sessions = collect_sessions(&state).await;
+async fn api_messages_latency(State(state): State<Arc<AppState>>, Query(r): Query<DateRange>) -> Json<serde_json::Value> {
+    let sessions = filter_by_date(collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::messages_latency(&sessions)).unwrap())
 }
 
-async fn api_tools_status(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
-    let sessions = collect_sessions(&state).await;
+async fn api_tools_status(State(state): State<Arc<AppState>>, Query(r): Query<DateRange>) -> Json<serde_json::Value> {
+    let sessions = filter_by_date(collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::tools_status(&sessions)).unwrap())
 }
 
-async fn api_git_activity(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
-    let sessions = collect_sessions(&state).await;
+async fn api_git_activity(State(state): State<Arc<AppState>>, Query(r): Query<DateRange>) -> Json<serde_json::Value> {
+    let sessions = filter_by_date(collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::git_activity(&sessions)).unwrap())
 }
 
-async fn api_directories(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
-    let sessions = collect_sessions(&state).await;
+async fn api_directories(State(state): State<Arc<AppState>>, Query(r): Query<DateRange>) -> Json<serde_json::Value> {
+    let sessions = filter_by_date(collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::directories(&sessions)).unwrap())
 }
 

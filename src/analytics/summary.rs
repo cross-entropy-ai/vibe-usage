@@ -4,6 +4,7 @@ use serde::Serialize;
 
 use crate::schema::{Role, Session};
 
+use super::local_date;
 use super::tokens::{TokenTotals, sum_tokens};
 
 // ── Result structs ─────────────────────────────────────────────────
@@ -37,6 +38,7 @@ pub struct DailyStats {
     pub date: String,
     pub sessions: u64,
     pub messages: u64,
+    pub user_messages: u64,
     pub input_tokens: u64,
     pub output_tokens: u64,
 }
@@ -75,16 +77,18 @@ pub fn summary(sessions: &[Session]) -> SummaryStats {
     // Daily stats
     let mut daily_map: BTreeMap<String, DailyStats> = BTreeMap::new();
     for s in sessions {
-        let day = s.start_time.format("%Y-%m-%d").to_string();
+        let day = local_date(&s.start_time);
         let entry = daily_map.entry(day.clone()).or_insert_with(|| DailyStats {
             date: day,
             sessions: 0,
             messages: 0,
+            user_messages: 0,
             input_tokens: 0,
             output_tokens: 0,
         });
         entry.sessions += 1;
         entry.messages += s.messages.len() as u64;
+        entry.user_messages += s.messages.iter().filter(|m| m.role == Role::User).count() as u64;
         let inp: u64 = s
             .messages
             .iter()
@@ -123,10 +127,10 @@ pub fn summary(sessions: &[Session]) -> SummaryStats {
     let period = PeriodRange {
         start: sessions
             .first()
-            .map(|s| s.start_time.format("%Y-%m-%d").to_string()),
+            .map(|s| local_date(&s.start_time)),
         end: sessions
             .last()
-            .map(|s| s.start_time.format("%Y-%m-%d").to_string()),
+            .map(|s| local_date(&s.start_time)),
     };
 
     SummaryStats {

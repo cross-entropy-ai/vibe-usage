@@ -5,7 +5,7 @@ use serde::Serialize;
 use crate::pricing::{self, PricingProvider};
 use crate::schema::Session;
 
-use super::round2;
+use super::{local_date, round2};
 
 // ── Result structs ─────────────────────────────────────────────────
 
@@ -21,6 +21,7 @@ pub struct CostBreakdown {
 
 #[derive(Debug, Serialize)]
 pub struct ModelCost {
+    pub date: String,
     pub model: String,
     pub tool: String,
     pub input_tokens: u64,
@@ -57,10 +58,12 @@ pub struct DailyCost {
 
 /// Full cost analysis.
 pub fn cost_breakdown(sessions: &[Session], pricing: &dyn PricingProvider) -> CostBreakdown {
-    // Per-model: all costs calculated at API rate
-    let mut by_model_map: HashMap<String, (u64, u64, u64, u64, u64, String)> = HashMap::new();
+    // Per (date, model): all costs calculated at API rate
+    let mut by_model_map: HashMap<(String, String), (u64, u64, u64, u64, u64, String)> =
+        HashMap::new();
     for s in sessions {
         let tool = s.tool.to_string();
+        let day = local_date(&s.start_time);
         for m in &s.messages {
             let model = m
                 .model
@@ -69,7 +72,7 @@ pub fn cost_breakdown(sessions: &[Session], pricing: &dyn PricingProvider) -> Co
                 .unwrap_or("unknown")
                 .to_string();
             let entry = by_model_map
-                .entry(model)
+                .entry((day.clone(), model))
                 .or_insert_with(|| (0, 0, 0, 0, 0, tool.clone()));
             if let Some(t) = &m.tokens {
                 entry.0 += t.input.unwrap_or(0);
@@ -83,13 +86,14 @@ pub fn cost_breakdown(sessions: &[Session], pricing: &dyn PricingProvider) -> Co
 
     let mut total_equiv = 0.0f64;
     let mut model_costs: Vec<ModelCost> = Vec::new();
-    for (model, (inp, out, think, cr, cw, tool)) in &by_model_map {
+    for ((date, model), (inp, out, think, cr, cw, tool)) in &by_model_map {
         let equiv = pricing
             .price_for(model)
             .map(|p| pricing::calculate_cost(&p, *inp, *out, *think, *cr, *cw))
             .unwrap_or(0.0);
         total_equiv += equiv;
         model_costs.push(ModelCost {
+            date: date.clone(),
             model: model.clone(),
             tool: tool.clone(),
             input_tokens: *inp,
@@ -141,7 +145,7 @@ pub fn cost_breakdown(sessions: &[Session], pricing: &dyn PricingProvider) -> Co
     let mut tool_last: HashMap<String, String> = HashMap::new();
     for s in sessions {
         let tool = s.tool.to_string();
-        let day = s.start_time.format("%Y-%m-%d").to_string();
+        let day = local_date(&s.start_time);
         tool_first
             .entry(tool.clone())
             .or_insert_with(|| day.clone());
@@ -190,7 +194,7 @@ pub fn cost_breakdown(sessions: &[Session], pricing: &dyn PricingProvider) -> Co
     // Daily cost (at API rate)
     let mut daily_map: BTreeMap<String, f64> = BTreeMap::new();
     for s in sessions {
-        let day = s.start_time.format("%Y-%m-%d").to_string();
+        let day = local_date(&s.start_time);
         for m in &s.messages {
             let model = m
                 .model

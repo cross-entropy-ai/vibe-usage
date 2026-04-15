@@ -4,6 +4,8 @@ use serde::Serialize;
 
 use crate::schema::Session;
 
+use super::local_date;
+
 // ── Result structs ─────────────────────────────────────────────────
 
 #[derive(Debug, Serialize)]
@@ -70,7 +72,7 @@ pub fn projects(sessions: &[Session]) -> Vec<ProjectStats> {
     let mut project_map: HashMap<String, ProjectStats> = HashMap::new();
     for s in sessions {
         let key = s.project.as_deref().unwrap_or("(unknown)").to_string();
-        let day = s.start_time.format("%Y-%m-%d").to_string();
+        let day = local_date(&s.start_time);
         let entry = project_map
             .entry(key.clone())
             .or_insert_with(|| ProjectStats {
@@ -193,7 +195,7 @@ pub fn git_activity(sessions: &[Session]) -> Vec<GitRepoStats> {
             None => continue,
         };
 
-        let day = s.start_time.format("%Y-%m-%d").to_string();
+        let day = local_date(&s.start_time);
         let entry = repos
             .entry(repo_key.clone())
             .or_insert_with(|| GitRepoStats {

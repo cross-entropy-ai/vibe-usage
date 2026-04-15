@@ -31,9 +31,17 @@ function shortenModels(names: string[]): string[] {
 }
 
 export function ModelsChart({ data, limit = 12 }: { data: ModelTokens[]; limit?: number }) {
-  const slice = data.slice(0, limit);
+  // Filter out models with no output or thinking tokens, then nullify zeros for log scale
+  const slice = data
+    .filter((d) => d.output_tokens > 0 || d.thinking_tokens > 0)
+    .slice(0, limit);
   const labels = shortenModels(slice.map((d) => d.model));
-  const top = slice.map((d, i) => ({ ...d, model: labels[i] }));
+  const top = slice.map((d, i) => ({
+    ...d,
+    model: labels[i],
+    output_tokens: d.output_tokens || null,
+    thinking_tokens: d.thinking_tokens || null,
+  }));
 
   return (
     <Card>

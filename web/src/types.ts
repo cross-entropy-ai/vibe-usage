@@ -49,6 +49,7 @@ export interface DailyStat {
   date: string;
   sessions: number;
   messages: number;
+  user_messages: number;
   input_tokens: number;
   output_tokens: number;
 }
@@ -180,6 +181,7 @@ export interface DirectoryStat {
 // ── Cost API types ─────────────────────────────────────────────
 
 export interface CostModelEntry {
+  date: string;
   model: string;
   tool: string;
   input_tokens: number;

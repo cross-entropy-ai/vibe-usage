@@ -15,6 +15,8 @@ const barConfig = {
 } satisfies ChartConfig;
 
 export function SessionsAreaChart({ daily }: { daily: DailyStat[] }) {
+  const safeDaily = daily.filter((d) => d.sessions > 0 && d.messages > 0);
+
   return (
     <Card>
       <CardHeader>
@@ -30,7 +32,7 @@ export function SessionsAreaChart({ daily }: { daily: DailyStat[] }) {
             <p className="text-xs text-muted-foreground">Independent scale</p>
           </div>
           <ChartContainer config={barConfig} className="h-[140px] w-full">
-            <BarChart data={daily} accessibilityLayer>
+            <BarChart data={safeDaily} accessibilityLayer>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="date" hide />
               <YAxis
@@ -55,7 +57,7 @@ export function SessionsAreaChart({ daily }: { daily: DailyStat[] }) {
             <p className="text-xs text-muted-foreground">Independent scale</p>
           </div>
           <ChartContainer config={barConfig} className="h-[140px] w-full">
-            <BarChart data={daily} accessibilityLayer>
+            <BarChart data={safeDaily} accessibilityLayer>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="date" tickFormatter={fmtDate} tickLine={false} axisLine={false} tickMargin={8} />
               <YAxis

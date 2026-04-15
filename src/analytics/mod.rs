@@ -17,9 +17,15 @@ pub use projects::*;
 pub use summary::*;
 pub use tokens::*;
 
+use chrono::{DateTime, Local, Utc};
 use serde::Serialize;
 
 // ── Shared helpers (visible to submodules only) ────────────────────
+
+/// Convert a UTC timestamp to a local-timezone date string (YYYY-MM-DD).
+pub(crate) fn local_date(ts: &DateTime<Utc>) -> String {
+    ts.with_timezone(&Local).format("%Y-%m-%d").to_string()
+}
 
 pub(crate) fn round2(v: f64) -> f64 {
     (v * 100.0).round() / 100.0

@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Sankey, Tooltip, Layer, Rectangle } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toolHslColor, toolLabel } from "@/lib/tools";
-import { fmtNum, shortenModel } from "@/lib/formatters";
+import { fmtNum, fmtUsd, shortenModel } from "@/lib/formatters";
 import type { CostModelEntry } from "@/types";
 
 const MODEL_COLOR = "hsl(215 20% 65%)";
@@ -59,17 +59,16 @@ function SankeyNode(props: {
 
 export function TokenFlowChart({ data, modelLimit = 12 }: { data: CostModelEntry[]; modelLimit?: number }) {
   const sankeyData = useMemo(() => {
-    // Aggregate: tool → model → total tokens
+    // Aggregate: tool → model → equivalent API cost
     const flows = new Map<string, Map<string, number>>();
     for (const entry of data) {
-      const total = entry.input_tokens + entry.output_tokens + entry.thinking_tokens;
-      if (total === 0) continue;
+      if (entry.equivalent_api_cost_usd === 0) continue;
 
       const tool = entry.tool;
       const model = shortenModel(entry.model).slice(0, 30);
       if (!flows.has(tool)) flows.set(tool, new Map());
       const toolMap = flows.get(tool)!;
-      toolMap.set(model, (toolMap.get(model) ?? 0) + total);
+      toolMap.set(model, (toolMap.get(model) ?? 0) + entry.equivalent_api_cost_usd);
     }
 
     // Build nodes: tools first, then models
@@ -78,7 +77,7 @@ export function TokenFlowChart({ data, modelLimit = 12 }: { data: CostModelEntry
     for (const toolMap of flows.values()) {
       for (const model of toolMap.keys()) modelSet.add(model);
     }
-    // Sort models by total tokens descending, keep top 12
+    // Sort models by total cost descending, keep top 12
     const modelTotals = Array.from(modelSet).map((model) => {
       let total = 0;
       for (const toolMap of flows.values()) total += toolMap.get(model) ?? 0;
@@ -139,14 +138,14 @@ export function TokenFlowChart({ data, modelLimit = 12 }: { data: CostModelEntry
 
   if (sankeyData.links.length === 0) return null;
 
-  const totalTokens = sankeyData.links.reduce((s, l) => s + l.value, 0);
+  const totalCost = sankeyData.links.reduce((s, l) => s + l.value, 0);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Token Flow</CardTitle>
+        <CardTitle className="text-base">Cost Flow</CardTitle>
         <CardDescription>
-          Tool → Model token distribution &middot; {fmtNum(totalTokens)} total
+          Tool → Model cost distribution &middot; {fmtUsd(totalCost)} total
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -162,7 +161,7 @@ export function TokenFlowChart({ data, modelLimit = 12 }: { data: CostModelEntry
             node={<SankeyNode x={0} y={0} width={0} height={0} index={0} payload={{ name: "", displayName: "", color: "" }} />}
           >
             <Tooltip
-              formatter={(value) => fmtNum(Number(value))}
+              formatter={(value) => fmtUsd(Number(value))}
             />
           </Sankey>
         </div>

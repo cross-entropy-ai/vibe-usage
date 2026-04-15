@@ -85,16 +85,30 @@ export interface DashboardData {
   sessionComplexity: SessionComplexityEntry[] | null;
 }
 
+export interface DateRange {
+  from?: string;
+  to?: string;
+}
+
 export async function fetchDashboardData(
   signal: AbortSignal,
   source: DataSource = httpSource,
+  dateRange?: DateRange,
 ): Promise<{
   data: DashboardData;
   errors: string[];
 }> {
+  const qs = dateRange
+    ? Object.entries(dateRange)
+        .filter(([, v]) => v)
+        .map(([k, v]) => `${k}=${encodeURIComponent(v!)}`)
+        .join("&")
+    : "";
+  const suffix = qs ? `?${qs}` : "";
+
   const keys = Object.keys(ENDPOINTS) as (keyof DashboardData)[];
   const results = await Promise.allSettled(
-    keys.map((k) => source.fetch(ENDPOINTS[k], signal)),
+    keys.map((k) => source.fetch(`${ENDPOINTS[k]}${suffix}`, signal)),
   );
 
   const errors: string[] = [];

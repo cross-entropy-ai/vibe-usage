@@ -1,5 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
+import { useSearchParamState } from "@/hooks/use-search-param-state";
+import type { DateRange } from "@/lib/api";
 import {
   SummaryProvider,
   CostProvider,
@@ -18,9 +20,12 @@ import { TablesSection } from "@/sections/tables-section";
 import {
   DashboardHeader,
   DashboardSection,
+  TREND_WINDOWS,
+  TOOL_LENS_VALUES,
   type ToolLens,
   type TrendWindow,
 } from "@/components/dashboard-shell";
+import { SectionNav } from "@/components/section-nav";
 import { fmtNum } from "@/lib/formatters";
 import { TOOL_NAMES, type Tool } from "@/lib/tools";
 import type { Summary } from "@/types";
@@ -59,48 +64,36 @@ function ErrorBanner({ errors }: { errors: string[] }) {
   );
 }
 
-function parseDate(value: string) {
-  return new Date(`${value}T00:00:00`);
-}
+function trendWindowToDateRange(window: TrendWindow): DateRange | undefined {
+  if (window === "all") return undefined;
 
-function filterByTrendWindow<T>(
-  items: T[],
-  getDate: (item: T) => string,
-  window: TrendWindow,
-) {
-  if (window === "all" || items.length === 0) return items;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const to = fmt(today);
 
-  const timestamps = items
-    .map((item) => parseDate(getDate(item)).getTime())
-    .filter((value) => !Number.isNaN(value));
-
-  if (timestamps.length === 0) return items;
-
-  const latest = new Date(Math.max(...timestamps));
-  const cutoff = new Date(latest);
-
+  const cutoff = new Date(today);
   if (window === "half-year") {
     cutoff.setMonth(cutoff.getMonth() - 6);
   } else if (window === "full-year") {
     cutoff.setFullYear(cutoff.getFullYear() - 1);
   } else {
     const days =
-      window === "24h"
-        ? 1
-        : window === "7day"
-          ? 7
-          : window === "14day"
-            ? 14
-            : window === "30day"
-              ? 30
-              : 90;
+      window === "24h" ? 1
+        : window === "7day" ? 7
+        : window === "14day" ? 14
+        : window === "30day" ? 30
+        : 90;
     cutoff.setDate(cutoff.getDate() - (days - 1));
   }
 
-  return items.filter((item) => {
-    const value = parseDate(getDate(item)).getTime();
-    return !Number.isNaN(value) && value >= cutoff.getTime() && value <= latest.getTime();
-  });
+  return { from: fmt(cutoff), to };
+}
+
+function fmt(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function filterToolCounts(counts: Record<Tool, number>, toolLens: ToolLens): Record<Tool, number> {
@@ -132,50 +125,24 @@ function getDailySummaryMetrics(summary: Summary | null) {
 }
 
 function Dashboard() {
-  const { data, errors, loading } = useDashboardData();
-  const [trendWindow, setTrendWindow] = useState<TrendWindow>("full-year");
-  const [toolLens, setToolLens] = useState<ToolLens>("all");
+  const [trendWindow, setTrendWindow] = useSearchParamState<TrendWindow>("window", "full-year", TREND_WINDOWS);
+  const [toolLens, setToolLens] = useSearchParamState<ToolLens>("tool", "all", TOOL_LENS_VALUES);
+
+  const dateRange = useMemo(() => trendWindowToDateRange(trendWindow), [trendWindow]);
+  const { data, errors, loading, initialLoad } = useDashboardData(dateRange);
 
   const filteredSummary = useMemo(() => {
     if (!data?.summary) return null;
-    const daily = filterByTrendWindow(data.summary.daily, (entry) => entry.date, trendWindow);
-    const metrics = daily.reduce(
-      (acc, entry) => {
-        acc.sessions += entry.sessions;
-        acc.messages += entry.messages;
-        acc.inputTokens += entry.input_tokens;
-        acc.outputTokens += entry.output_tokens;
-        return acc;
-      },
-      { sessions: 0, messages: 0, inputTokens: 0, outputTokens: 0 },
-    );
-
     return {
       ...data.summary,
-      daily,
-      total_sessions: metrics.sessions,
-      messages: {
-        ...data.summary.messages,
-        total: metrics.messages,
-      },
-      tokens: {
-        ...data.summary.tokens,
-        input: metrics.inputTokens,
-        output: metrics.outputTokens,
-      },
       by_tool: filterToolCounts(data.summary.by_tool, toolLens),
-      period: {
-        start: daily[0]?.date ?? data.summary.period.start,
-        end: daily[daily.length - 1]?.date ?? data.summary.period.end,
-      },
     };
-  }, [data, toolLens, trendWindow]);
+  }, [data, toolLens]);
 
   const filteredCost = useMemo(() => {
     if (!data?.cost) return null;
     return {
       ...data.cost,
-      daily: filterByTrendWindow(data.cost.daily, (entry) => entry.date, trendWindow),
       by_tool:
         toolLens === "all"
           ? data.cost.by_tool
@@ -187,11 +154,11 @@ function Dashboard() {
           ? data.cost.by_model
           : data.cost.by_model.filter((entry) => entry.tool === toolLens),
     };
-  }, [data, toolLens, trendWindow]);
+  }, [data, toolLens]);
 
   const filteredTokensDaily = useMemo(() => {
     if (!data?.tokensDaily) return null;
-    return filterByTrendWindow(data.tokensDaily, (entry) => entry.date, trendWindow).map((entry) => ({
+    return data.tokensDaily.map((entry) => ({
       ...entry,
       by_tool:
         toolLens === "all"
@@ -200,27 +167,25 @@ function Dashboard() {
             ? { [toolLens]: entry.by_tool[toolLens] }
             : {},
     }));
-  }, [data, toolLens, trendWindow]);
+  }, [data, toolLens]);
 
-  const filteredDuration = useMemo(() => {
-    if (!data?.duration) return null;
-    return {
-      ...data.duration,
-      daily: filterByTrendWindow(data.duration.daily, (entry) => entry.date, trendWindow),
-    };
-  }, [data, trendWindow]);
   const summaryMetrics = useMemo(
     () => getDailySummaryMetrics(filteredSummary),
     [filteredSummary],
   );
-  const canShowGlobalBreakdowns = trendWindow === "all" && toolLens === "all";
 
-  if (loading || !data || Object.values(data).every((v) => v === null)) {
-    return <DashboardFallback loading={loading} errors={errors} />;
+  if (initialLoad || !data || Object.values(data).every((v) => v === null)) {
+    return <DashboardFallback loading={initialLoad} errors={errors} />;
   }
 
   return (
     <div className="dashboard-shell min-h-screen bg-background">
+      {loading && (
+        <div className="fixed inset-x-0 top-0 z-50 h-0.5 overflow-hidden bg-slate-200/60">
+          <div className="h-full w-1/3 animate-pulse bg-sky-600 [animation-duration:800ms]"
+            style={{ animation: "slide 1s ease-in-out infinite" }} />
+        </div>
+      )}
       <div
         aria-hidden
         className="dashboard-grid pointer-events-none fixed inset-0"
@@ -238,6 +203,7 @@ function Dashboard() {
           />
 
           <ErrorBanner errors={errors} />
+          <SectionNav />
 
         {composeProviders(
           [
@@ -255,7 +221,7 @@ function Dashboard() {
               thinking: data.thinking,
             }],
             [ModelsToolsProvider, {
-              duration: filteredDuration,
+              duration: data.duration,
               models: data.models,
               toolCalls: data.toolCalls,
               toolStatus: data.toolStatus,
@@ -345,14 +311,6 @@ function Dashboard() {
                         label: "Output",
                         value: fmtNum(summaryMetrics.outputTokens),
                       },
-                      ...(canShowGlobalBreakdowns && data.summary
-                        ? [
-                            {
-                              label: "Thinking",
-                              value: fmtNum(data.summary.tokens.thinking),
-                            },
-                          ]
-                        : []),
                     ]
                   : undefined
               }

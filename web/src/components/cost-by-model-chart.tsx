@@ -14,10 +14,18 @@ const config = {
 } satisfies ChartConfig;
 
 export function CostByModelChart({ data, limit = 10 }: { data: CostModelEntry[]; limit?: number }) {
-  const topModels = data.slice(0, limit).map((m) => ({
-    ...m,
-    model: m.model.replace(/-\d{8}$/, "").slice(0, 24),
-  }));
+  // Aggregate per-date entries into per-model totals
+  const modelMap = new Map<string, number>();
+  for (const entry of data) {
+    const key = entry.model.replace(/-\d{8}$/, "").slice(0, 24);
+    modelMap.set(key, (modelMap.get(key) ?? 0) + entry.equivalent_api_cost_usd);
+  }
+  const topModels = Array.from(modelMap, ([model, equivalent_api_cost_usd]) => ({
+    model,
+    equivalent_api_cost_usd,
+  }))
+    .sort((a, b) => b.equivalent_api_cost_usd - a.equivalent_api_cost_usd)
+    .slice(0, limit);
 
   return (
     <Card>

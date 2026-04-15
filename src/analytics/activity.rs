@@ -5,7 +5,7 @@ use serde::Serialize;
 
 use crate::schema::{Role, Session};
 
-use super::{BucketCount, percentile_u64};
+use super::{BucketCount, local_date, percentile_u64};
 
 // ── Result structs ─────────────────────────────────────────────────
 
@@ -84,7 +84,7 @@ pub fn duration(sessions: &[Session]) -> DurationStats {
         if dur == 0 {
             continue;
         }
-        let day = s.start_time.format("%Y-%m-%d").to_string();
+        let day = local_date(&s.start_time);
         *daily.entry(day).or_default() += dur;
         let proj = s.project.as_deref().unwrap_or("(unknown)").to_string();
         *by_project.entry(proj).or_default() += dur;

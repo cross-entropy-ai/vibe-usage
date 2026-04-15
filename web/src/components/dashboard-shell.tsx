@@ -25,15 +25,10 @@ import type {
   Summary,
 } from "@/types";
 
-export type TrendWindow =
-  | "24h"
-  | "7day"
-  | "14day"
-  | "30day"
-  | "90day"
-  | "half-year"
-  | "full-year"
-  | "all";
+export const TREND_WINDOWS = ["24h", "7day", "14day", "30day", "90day", "half-year", "full-year", "all"] as const;
+export type TrendWindow = (typeof TREND_WINDOWS)[number];
+
+export const TOOL_LENS_VALUES = ["all", ...TOOL_NAMES] as const;
 export type ToolLens = "all" | Tool;
 
 interface DashboardHeaderProps {
@@ -138,6 +133,22 @@ export function DashboardHeader({
       icon: Sparkles,
     },
     {
+      label: "Total Tokens",
+      value: summary ? fmtMillions(totalTokens) : "N/A",
+      detail: summary
+        ? `${fmtMillions(windowInputTokens)} input / ${fmtMillions(windowOutputTokens)} output`
+        : "Token totals unavailable",
+      icon: Gauge,
+    },
+    {
+      label: "Messages",
+      value: summary ? fmtNum(windowMessages) : "N/A",
+      detail: summary
+        ? `${fmtNum(summary.messages.user)} user / ${fmtNum(summary.messages.assistant)} agent`
+        : "Message totals unavailable",
+      icon: Bot,
+    },
+    {
       label: "Sessions",
       value: summary ? fmtNum(windowSessions) : "N/A",
       detail:
@@ -145,22 +156,6 @@ export function DashboardHeader({
           ? `${avgSessionsPerDay.toFixed(1)} sessions per active day`
           : "Waiting for session coverage",
       icon: Activity,
-    },
-    {
-      label: "Messages",
-      value: summary ? fmtNum(windowMessages) : "N/A",
-      detail: summary
-        ? `${activeDays} active days in the selected window`
-        : "Message totals unavailable",
-      icon: Bot,
-    },
-    {
-      label: "Total Tokens",
-      value: summary ? fmtMillions(totalTokens) : "N/A",
-      detail: summary
-        ? `${fmtMillions(windowInputTokens)} input / ${fmtMillions(windowOutputTokens)} output`
-        : "Token totals unavailable",
-      icon: Gauge,
     },
   ];
 
@@ -266,7 +261,7 @@ export function DashboardSection({
   children,
 }: DashboardSectionProps) {
   return (
-    <section id={id} className="scroll-mt-24 space-y-3">
+    <section id={id} className="scroll-mt-14 space-y-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-1.5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-700">

@@ -4,6 +4,8 @@ use serde::Serialize;
 
 use crate::schema::Session;
 
+use super::local_date;
+
 // ── Result structs ─────────────────────────────────────────────────
 
 #[derive(Debug, Serialize)]
@@ -84,7 +86,7 @@ pub fn sum_tokens(sessions: &[Session]) -> TokenTotals {
 pub fn daily_tokens(sessions: &[Session]) -> Vec<DailyTokensByTool> {
     let mut daily: BTreeMap<String, HashMap<String, (u64, u64, u64)>> = BTreeMap::new();
     for s in sessions {
-        let day = s.start_time.format("%Y-%m-%d").to_string();
+        let day = local_date(&s.start_time);
         let tool = s.tool.to_string();
         let entry = daily.entry(day).or_default().entry(tool).or_default();
         for m in &s.messages {

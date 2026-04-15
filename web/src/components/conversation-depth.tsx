@@ -22,11 +22,13 @@ export function ConversationDepth({ data }: { data: ConversationsInsight }) {
       data.response_length.histogram.map((entry) => [entry.bucket, entry.count]),
     );
 
-    return data.prompt_length.histogram.map((entry) => ({
-      bucket: entry.bucket,
-      prompt: entry.count,
-      response: responseByBucket.get(entry.bucket) ?? 0,
-    }));
+    return data.prompt_length.histogram
+      .map((entry) => ({
+        bucket: entry.bucket,
+        prompt: entry.count || null,
+        response: responseByBucket.get(entry.bucket) || null,
+      }))
+      .filter((entry) => entry.prompt !== null || entry.response !== null);
   }, [data.prompt_length.histogram, data.response_length.histogram]);
 
   return (
@@ -64,7 +66,7 @@ export function ConversationDepth({ data }: { data: ConversationsInsight }) {
             <BarChart data={lengthHistogram} accessibilityLayer>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="bucket" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-              <YAxis tickLine={false} axisLine={false} />
+              <YAxis scale="log" domain={[1, "auto"]} tickFormatter={fmtNum} tickLine={false} axisLine={false} />
               <ChartTooltip content={<ChartTooltipContent />} />
               <Legend />
               <Bar dataKey="prompt" fill="var(--color-prompt)" radius={[4, 4, 0, 0]} />

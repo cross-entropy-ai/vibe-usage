@@ -7,6 +7,7 @@ use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Deserialize;
 use tokio::sync::RwLock;
 
+use crate::analytics::local_date;
 use crate::collector::{Collector, raw_dirs_for};
 use crate::pricing::PricingProvider;
 use crate::schema::Session;
@@ -128,6 +129,36 @@ pub struct SessionFilter {
     pub offset: Option<usize>,
 }
 
+/// Lightweight date-range filter shared by all analytics endpoints.
+#[derive(Deserialize, Default)]
+pub struct DateRange {
+    pub from: Option<String>,
+    pub to: Option<String>,
+}
+
+pub fn filter_by_date(sessions: Vec<Session>, range: &DateRange) -> Vec<Session> {
+    if range.from.is_none() && range.to.is_none() {
+        return sessions;
+    }
+    sessions
+        .into_iter()
+        .filter(|s| {
+            let day = local_date(&s.start_time);
+            if let Some(ref from) = range.from {
+                if day < *from {
+                    return false;
+                }
+            }
+            if let Some(ref to) = range.to {
+                if day > *to {
+                    return false;
+                }
+            }
+            true
+        })
+        .collect()
+}
+
 pub fn filter_sessions(sessions: Vec<Session>, q: &SessionFilter) -> Vec<Session> {
     sessions
         .into_iter()
@@ -138,12 +169,12 @@ pub fn filter_sessions(sessions: Vec<Session>, q: &SessionFilter) -> Vec<Session
                 }
             }
             if let Some(ref from) = q.from {
-                if s.start_time.format("%Y-%m-%d").to_string() < *from {
+                if local_date(&s.start_time) < *from {
                     return false;
                 }
             }
             if let Some(ref to) = q.to {
-                if s.start_time.format("%Y-%m-%d").to_string() > *to {
+                if local_date(&s.start_time) > *to {
                     return false;
                 }
             }
