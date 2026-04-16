@@ -1,4 +1,4 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   ChartContainer,
@@ -8,20 +8,33 @@ import {
 } from "@/components/ui/chart";
 import { fmtUsd } from "@/lib/formatters";
 import type { ProjectionResult } from "@/lib/projector-calc";
+import type { CostMode } from "./projection-table";
 
-const config = {
-  cost_with_cache: { label: "With Cache", color: "hsl(221 83% 53%)" },
-  cost_without_cache: { label: "No Cache", color: "hsl(25 95% 53%)" },
-} satisfies ChartConfig;
+const MODE_CONFIG: Record<CostMode, { key: string; label: string; color: string }> = {
+  with_cache: { key: "cost_with_cache", label: "With Cache", color: "hsl(221 83% 53%)" },
+  without_cache: { key: "cost_without_cache", label: "No Cache", color: "hsl(25 95% 53%)" },
+};
 
 interface Props {
   data: ProjectionResult[];
-  currentModels: string[];
+  mode: CostMode;
   limit?: number;
 }
 
-export function ProjectionChart({ data, currentModels, limit = 15 }: Props) {
-  const top = data.slice(0, limit).map((d) => ({
+export function ProjectionChart({ data, mode, limit = 15 }: Props) {
+  const modeInfo = MODE_CONFIG[mode];
+
+  const config = {
+    [modeInfo.key]: { label: modeInfo.label, color: modeInfo.color },
+  } satisfies ChartConfig;
+
+  const sorted = [...data].sort((a, b) => {
+    const costA = mode === "with_cache" ? a.cost_with_cache : a.cost_without_cache;
+    const costB = mode === "with_cache" ? b.cost_with_cache : b.cost_without_cache;
+    return costA - costB;
+  });
+
+  const top = sorted.slice(0, limit).map((d) => ({
     ...d,
     model: d.model.replace(/-\d{8}$/, "").slice(0, 24),
   }));
@@ -29,7 +42,7 @@ export function ProjectionChart({ data, currentModels, limit = 15 }: Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Cost Projection</CardTitle>
+        <CardTitle className="text-base">{modeInfo.label}</CardTitle>
         <CardDescription>Top {limit} models by cost (lower is cheaper)</CardDescription>
       </CardHeader>
       <CardContent>
@@ -51,16 +64,9 @@ export function ProjectionChart({ data, currentModels, limit = 15 }: Props) {
               axisLine={false}
             />
             <ChartTooltip content={<ChartTooltipContent />} />
-            <Legend />
             <Bar
-              dataKey="cost_with_cache"
-              fill="var(--color-cost_with_cache)"
-              radius={[0, 4, 4, 0]}
-              minPointSize={2}
-            />
-            <Bar
-              dataKey="cost_without_cache"
-              fill="var(--color-cost_without_cache)"
+              dataKey={modeInfo.key}
+              fill={`var(--color-${modeInfo.key})`}
               radius={[0, 4, 4, 0]}
               minPointSize={2}
             />

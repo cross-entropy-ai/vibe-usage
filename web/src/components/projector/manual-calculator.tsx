@@ -92,10 +92,16 @@ export function ManualCalculator({ models }: Props) {
       </Card>
 
       {projection && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <ProjectionTable data={projection} currentModels={[]} currentCost={0} />
-          <ProjectionChart data={projection} currentModels={[]} />
-        </div>
+        <>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ProjectionTable data={projection} mode="with_cache" currentModels={[]} currentCost={0} />
+            <ProjectionTable data={projection} mode="without_cache" currentModels={[]} currentCost={0} />
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ProjectionChart data={projection} mode="with_cache" />
+            <ProjectionChart data={projection} mode="without_cache" />
+          </div>
+        </>
       )}
     </section>
   );

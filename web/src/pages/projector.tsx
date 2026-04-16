@@ -115,13 +115,20 @@ export default function ProjectorPage() {
             <div className="grid gap-4 lg:grid-cols-2">
               <ProjectionTable
                 data={projection}
+                mode="with_cache"
                 currentModels={currentModels}
                 currentCost={currentCost}
               />
-              <ProjectionChart
+              <ProjectionTable
                 data={projection}
+                mode="without_cache"
                 currentModels={currentModels}
+                currentCost={currentCost}
               />
+            </div>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <ProjectionChart data={projection} mode="with_cache" />
+              <ProjectionChart data={projection} mode="without_cache" />
             </div>
           </section>
         )}
