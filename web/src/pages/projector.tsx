@@ -6,6 +6,7 @@ import { projectUsage } from "@/lib/projector-calc";
 import { ProjectionTable } from "@/components/projector/projection-table";
 import { ProjectionChart } from "@/components/projector/projection-chart";
 import { Button } from "@/components/ui/button";
+import { ManualCalculator } from "@/components/projector/manual-calculator";
 import type { DateRange } from "@/lib/api";
 
 const TREND_WINDOWS = ["7day", "14day", "30day", "90day", "all"] as const;
@@ -122,6 +123,10 @@ export default function ProjectorPage() {
               />
             </div>
           </section>
+        )}
+
+        {models && (
+          <ManualCalculator models={models.models} />
         )}
       </div>
     </div>
