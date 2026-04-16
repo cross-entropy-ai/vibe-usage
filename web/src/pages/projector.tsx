@@ -100,17 +100,14 @@ export default function ProjectorPage() {
         </div>
 
         {usage && (() => {
-          const totalSessions = usage.by_model.reduce((s, m) => s + m.sessions, 0);
           const totalCost = usage.by_model.reduce((s, m) => s + m.equivalent_api_cost, 0);
           const t = usage.totals.with_cache;
           const totalTokens = t.input_tokens + t.output_tokens + t.thinking_tokens + t.cache_read_tokens + t.cache_write_tokens;
           return (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2">
               {[
                 { label: "Equivalent API Cost", value: fmtUsd(totalCost) },
                 { label: "Total Tokens", value: fmtNum(totalTokens) },
-                { label: "Sessions", value: fmtNum(totalSessions) },
-                { label: "Models Used", value: String(usage.by_model.length) },
               ].map((item) => (
                 <div key={item.label} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
                   <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{item.label}</span>
