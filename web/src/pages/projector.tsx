@@ -1,7 +1,6 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useMemo, useState, useCallback } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useProjectorData } from "@/hooks/use-projector-data";
-import { useSearchParamState } from "@/hooks/use-search-param-state";
 import { projectUsage } from "@/lib/projector-calc";
 import { ProjectionTable, type SortState } from "@/components/projector/projection-table";
 import { ProjectionChart } from "@/components/projector/projection-chart";
@@ -33,7 +32,18 @@ function fmt(d: Date): string {
 }
 
 export default function ProjectorPage() {
-  const [trendWindow, setTrendWindow] = useSearchParamState<TrendWindow>("window", "30day", TREND_WINDOWS);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const trendWindow = (TREND_WINDOWS as readonly string[]).includes(searchParams.get("window") ?? "")
+    ? (searchParams.get("window") as TrendWindow)
+    : "30day";
+  const setTrendWindow = useCallback((w: TrendWindow) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (w === "30day") next.delete("window");
+      else next.set("window", w);
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
   const dateRange = useMemo(() => trendWindowToDateRange(trendWindow), [trendWindow]);
   const { models, usage, loading, errors, initialLoad } = useProjectorData(dateRange);
 
