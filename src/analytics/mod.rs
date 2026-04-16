@@ -7,6 +7,7 @@ mod activity;
 mod cost;
 mod insights;
 mod projects;
+mod projector;
 mod summary;
 mod tokens;
 
@@ -14,6 +15,7 @@ pub use activity::*;
 pub use cost::*;
 pub use insights::*;
 pub use projects::*;
+pub use projector::*;
 pub use summary::*;
 pub use tokens::*;
 

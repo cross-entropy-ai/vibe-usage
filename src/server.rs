@@ -140,6 +140,21 @@ async fn api_directories(
     Json(serde_json::to_value(analytics::directories(&sessions)).unwrap())
 }
 
+async fn api_projector_models(
+    State(state): State<Arc<AppState>>,
+) -> Json<serde_json::Value> {
+    let models = state.pricing.all_models();
+    Json(serde_json::json!({ "models": models }))
+}
+
+async fn api_projector_usage_summary(
+    State(state): State<Arc<AppState>>,
+    Query(r): Query<DateRange>,
+) -> Json<serde_json::Value> {
+    let sessions = filter_by_date(collect_sessions(&state).await, &r);
+    Json(serde_json::to_value(analytics::usage_summary(&sessions, state.pricing.as_ref())).unwrap())
+}
+
 async fn static_handler(uri: Uri) -> Response {
     let path = uri.path().trim_start_matches('/');
     let path = if path.is_empty() { "index.html" } else { path };
@@ -187,6 +202,8 @@ pub async fn serve(
         .route("/api/tools/status", get(api_tools_status))
         .route("/api/git/activity", get(api_git_activity))
         .route("/api/directories", get(api_directories))
+        .route("/api/projector/models", get(api_projector_models))
+        .route("/api/projector/usage-summary", get(api_projector_usage_summary))
         .merge(crate::insights::router())
         .layer(CorsLayer::permissive())
         .fallback(static_handler)
