@@ -9,20 +9,18 @@ export function useProjectorData(dateRange?: DateRange) {
   const [errors, setErrors] = useState<string[]>([]);
   const hasData = useRef(false);
 
-  const rangeKey = `${dateRange?.from ?? ""}_${dateRange?.to ?? ""}`;
+  const from = dateRange?.from;
+  const to = dateRange?.to;
 
   useEffect(() => {
     setLoading(true);
     const controller = new AbortController();
     const signal = controller.signal;
 
-    const qs = dateRange
-      ? Object.entries(dateRange)
-          .filter(([, v]) => v)
-          .map(([k, v]) => `${k}=${encodeURIComponent(v!)}`)
-          .join("&")
-      : "";
-    const suffix = qs ? `?${qs}` : "";
+    const params = new URLSearchParams();
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    const suffix = params.toString() ? `?${params.toString()}` : "";
 
     Promise.allSettled([
       fetch("/api/projector/models", { signal }).then((r) => {
@@ -46,7 +44,7 @@ export function useProjectorData(dateRange?: DateRange) {
     });
 
     return () => controller.abort();
-  }, [rangeKey]);
+  }, [from, to]);
 
   return { models, usage, loading, errors, initialLoad: loading && !hasData.current };
 }
