@@ -18,28 +18,50 @@ const MODE_LABELS: Record<CostMode, { title: string; description: string }> = {
   without_cache: { title: "Without Cache", description: "Projected cost treating all tokens as raw input/output" },
 };
 
+type SortKey = "model" | "provider" | "cost" | "diff";
+
 export function ProjectionTable({ data, mode, currentModels, currentCost }: Props) {
   const [providerFilter, setProviderFilter] = useState<string>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("cost");
+  const [sortAsc, setSortAsc] = useState(true);
 
   const providers = useMemo(() => {
     const set = new Set(data.map((d) => d.provider));
     return ["all", ...Array.from(set).sort()];
   }, [data]);
 
+  const costOf = (row: ProjectionResult) =>
+    mode === "with_cache" ? row.cost_with_cache : row.cost_without_cache;
+
+  const diffOf = (row: ProjectionResult) =>
+    currentCost > 0 ? ((costOf(row) - currentCost) / currentCost) * 100 : 0;
+
   const sorted = useMemo(() => {
     const list = [...data];
     list.sort((a, b) => {
-      const costA = mode === "with_cache" ? a.cost_with_cache : a.cost_without_cache;
-      const costB = mode === "with_cache" ? b.cost_with_cache : b.cost_without_cache;
-      return costA - costB;
+      let cmp = 0;
+      switch (sortKey) {
+        case "model": cmp = a.model.localeCompare(b.model); break;
+        case "provider": cmp = a.provider.localeCompare(b.provider); break;
+        case "cost": cmp = costOf(a) - costOf(b); break;
+        case "diff": cmp = diffOf(a) - diffOf(b); break;
+      }
+      return sortAsc ? cmp : -cmp;
     });
     return list;
-  }, [data, mode]);
+  }, [data, mode, sortKey, sortAsc, currentCost]);
 
   const filtered = useMemo(() => {
     if (providerFilter === "all") return sorted;
     return sorted.filter((d) => d.provider === providerFilter);
   }, [sorted, providerFilter]);
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortAsc(!sortAsc);
+    else { setSortKey(key); setSortAsc(true); }
+  }
+
+  const indicator = (key: SortKey) => (sortKey === key ? (sortAsc ? " ↑" : " ↓") : "");
 
   const label = MODE_LABELS[mode];
 
@@ -68,22 +90,19 @@ export function ProjectionTable({ data, mode, currentModels, currentCost }: Prop
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-xs text-slate-500">
-                <th className="pb-2 pr-4 font-medium">Model</th>
-                <th className="pb-2 pr-4 font-medium">Provider</th>
-                <th className="pb-2 pr-4 font-medium text-right">Cost</th>
-                <th className="pb-2 font-medium text-right">vs Actual</th>
+                <th className="pb-2 pr-4 font-medium cursor-pointer" onClick={() => toggleSort("model")}>Model{indicator("model")}</th>
+                <th className="pb-2 pr-4 font-medium cursor-pointer" onClick={() => toggleSort("provider")}>Provider{indicator("provider")}</th>
+                <th className="pb-2 pr-4 font-medium text-right cursor-pointer" onClick={() => toggleSort("cost")}>Cost{indicator("cost")}</th>
+                <th className="pb-2 font-medium text-right cursor-pointer" onClick={() => toggleSort("diff")}>vs Actual{indicator("diff")}</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((row) => {
-                const cost = mode === "with_cache" ? row.cost_with_cache : row.cost_without_cache;
+                const cost = costOf(row);
                 const isCurrent = currentModels.some(
                   (m) => row.model.includes(m) || m.includes(row.model),
                 );
-                const diff =
-                  currentCost > 0
-                    ? ((cost - currentCost) / currentCost) * 100
-                    : 0;
+                const diff = diffOf(row);
                 return (
                   <tr
                     key={row.model}
