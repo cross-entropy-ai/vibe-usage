@@ -82,28 +82,15 @@ impl Collector for GeminiCollector {
         vec!["*/chats/*.json"]
     }
 
-    fn parse(&self, raw_dir: &Path) -> Result<ParseResult> {
-        let pattern = raw_dir.join("*/chats/*.json");
-        let pattern = pattern.to_string_lossy();
-
-        let mut sessions = Vec::new();
-        let mut warnings = Vec::new();
-        for entry in glob::glob(&pattern)? {
-            let path = match entry {
-                Ok(p) => p,
-                Err(e) => {
-                    warnings.push(format!("gemini: glob entry: {e}"));
-                    continue;
-                }
-            };
-            match parse_gemini_file(&path) {
-                Ok(s) => sessions.push(s),
-                Err(e) => warnings.push(format!("gemini: {}: {e}", path.display())),
-            }
-        }
-        sessions.sort_by_key(|s| s.start_time);
-        Ok(ParseResult { sessions, warnings })
+    fn parse_glob(&self) -> &str {
+        "*/chats/*.json"
     }
+
+    fn parse_file(&self, path: &Path) -> Result<ParseResult> {
+        let session = parse_gemini_file(&path.to_path_buf())?;
+        Ok(ParseResult { sessions: vec![session], warnings: vec![] })
+    }
+
 }
 
 fn parse_gemini_file(path: &PathBuf) -> Result<Session> {

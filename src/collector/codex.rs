@@ -85,29 +85,17 @@ impl Collector for CodexCollector {
         vec!["*/*/*/*.jsonl"]
     }
 
-    fn parse(&self, raw_dir: &Path) -> Result<ParseResult> {
-        let pattern = raw_dir.join("*/*/*/*.jsonl");
-        let pattern = pattern.to_string_lossy();
-
-        let mut sessions = Vec::new();
-        let mut warnings = Vec::new();
-        for entry in glob::glob(&pattern)? {
-            let path = match entry {
-                Ok(p) => p,
-                Err(e) => {
-                    warnings.push(format!("codex: glob entry: {e}"));
-                    continue;
-                }
-            };
-            match parse_codex_file(&path) {
-                Ok(Some(s)) => sessions.push(s),
-                Ok(None) => {}
-                Err(e) => warnings.push(format!("codex: {}: {e}", path.display())),
-            }
-        }
-        sessions.sort_by_key(|s| s.start_time);
-        Ok(ParseResult { sessions, warnings })
+    fn parse_glob(&self) -> &str {
+        "*/*/*/*.jsonl"
     }
+
+    fn parse_file(&self, path: &Path) -> Result<ParseResult> {
+        let sessions = parse_codex_file(&path.to_path_buf())?
+            .into_iter()
+            .collect();
+        Ok(ParseResult { sessions, warnings: vec![] })
+    }
+
 }
 
 fn parse_codex_file(path: &PathBuf) -> Result<Option<Session>> {

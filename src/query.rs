@@ -16,7 +16,7 @@ pub struct AppState {
     pub collectors: Vec<Box<dyn Collector + Send + Sync>>,
     pub data_dir: PathBuf,
     pub pricing: Box<dyn PricingProvider>,
-    cache: RwLock<Option<Vec<Session>>>,
+    cache: RwLock<Option<Arc<Vec<Session>>>>,
     dirty: Arc<AtomicBool>,
     has_watcher: bool,
     _watcher: Option<RecommendedWatcher>,
@@ -66,33 +66,35 @@ fn parse_sessions(state: &AppState) -> Vec<Session> {
     let mut all = Vec::new();
     for c in &state.collectors {
         for raw_dir in raw_dirs_for(c.as_ref(), &state.data_dir) {
-            let host = raw_dir
+            let host_name = raw_dir
                 .parent()
                 .and_then(|p| p.file_name())
                 .map(|n| n.to_string_lossy().to_string());
-            match c.parse(&raw_dir) {
-                Ok(result) => {
-                    for w in &result.warnings {
-                        eprintln!("warn: {w}");
-                    }
-                    let mut sessions = result.sessions;
-                    for s in &mut sessions {
-                        s.hostname = host.clone();
-                    }
-                    all.extend(sessions);
-                }
-                Err(e) => {
-                    eprintln!("error: {} parse {}: {e}", c.name(), raw_dir.display());
-                }
+
+            let cache_path = state
+                .data_dir
+                .join("cache")
+                .join(host_name.as_deref().unwrap_or("unknown"))
+                .join(format!("{}.bin", c.name()));
+
+            let result = crate::cache::cached_parse(c.as_ref(), &raw_dir, &cache_path);
+
+            for w in &result.warnings {
+                eprintln!("warn: {w}");
             }
+            let mut sessions = result.sessions;
+            for s in &mut sessions {
+                s.hostname = host_name.clone();
+            }
+            all.extend(sessions);
         }
     }
     all.sort_by_key(|s| s.start_time);
     all
 }
 
-pub async fn collect_sessions(state: &AppState) -> Vec<Session> {
-    // Fast path: not dirty, return cache if available
+pub async fn collect_sessions(state: &AppState) -> Arc<Vec<Session>> {
+    // Fast path: not dirty, return cache via read lock (concurrent readers)
     if !state.dirty.load(Ordering::Acquire) {
         let cache = state.cache.read().await;
         if let Some(ref sessions) = *cache {
@@ -114,7 +116,7 @@ pub async fn collect_sessions(state: &AppState) -> Vec<Session> {
         state.dirty.store(false, Ordering::Release);
     }
 
-    let sessions = parse_sessions(state);
+    let sessions = Arc::new(parse_sessions(state));
     *cache = Some(sessions.clone());
     sessions
 }
@@ -136,12 +138,12 @@ pub struct DateRange {
     pub to: Option<String>,
 }
 
-pub fn filter_by_date(sessions: Vec<Session>, range: &DateRange) -> Vec<Session> {
+pub fn filter_by_date(sessions: &[Session], range: &DateRange) -> Vec<Session> {
     if range.from.is_none() && range.to.is_none() {
-        return sessions;
+        return sessions.to_vec();
     }
     sessions
-        .into_iter()
+        .iter()
         .filter(|s| {
             let day = local_date(&s.start_time);
             if let Some(ref from) = range.from {
@@ -156,12 +158,13 @@ pub fn filter_by_date(sessions: Vec<Session>, range: &DateRange) -> Vec<Session>
             }
             true
         })
+        .cloned()
         .collect()
 }
 
-pub fn filter_sessions(sessions: Vec<Session>, q: &SessionFilter) -> Vec<Session> {
+pub fn filter_sessions(sessions: &[Session], q: &SessionFilter) -> Vec<Session> {
     sessions
-        .into_iter()
+        .iter()
         .filter(|s| {
             if let Some(ref tool) = q.tool {
                 if s.tool.to_string() != *tool {
@@ -190,6 +193,7 @@ pub fn filter_sessions(sessions: Vec<Session>, q: &SessionFilter) -> Vec<Session
             }
             true
         })
+        .cloned()
         .collect()
 }
 

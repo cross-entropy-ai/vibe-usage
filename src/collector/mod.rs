@@ -27,10 +27,11 @@ pub trait Collector: Send + Sync {
     /// Glob patterns *relative to source_dir* for files to sync.
     fn glob_patterns(&self) -> Vec<&str>;
 
-    /// Parse sessions from the local raw copy at `raw_dir`.
-    /// `raw_dir` is `<data_dir>/raw/<hostname>/<name>/`.
-    /// Individual file errors are captured as warnings instead of aborting.
-    fn parse(&self, raw_dir: &Path) -> Result<ParseResult>;
+    /// Glob pattern *relative to raw_dir* for files to parse.
+    fn parse_glob(&self) -> &str;
+
+    /// Parse a single file into sessions.
+    fn parse_file(&self, path: &Path) -> Result<ParseResult>;
 }
 
 pub struct SyncStats {

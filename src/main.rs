@@ -1,6 +1,7 @@
 #[allow(dead_code)]
 mod agent;
 mod analytics;
+mod cache;
 mod cli;
 mod collector;
 mod insights;

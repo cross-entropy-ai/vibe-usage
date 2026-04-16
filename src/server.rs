@@ -23,7 +23,7 @@ async fn api_sessions(
     State(state): State<Arc<AppState>>,
     Query(q): Query<SessionFilter>,
 ) -> Json<serde_json::Value> {
-    let sessions = filter_sessions(collect_sessions(&state).await, &q);
+    let sessions = filter_sessions(&collect_sessions(&state).await, &q);
     let total = sessions.len();
     let sessions = paginate(sessions, &q);
     Json(serde_json::json!({
@@ -38,7 +38,7 @@ async fn api_summary(
     State(state): State<Arc<AppState>>,
     Query(r): Query<DateRange>,
 ) -> Json<serde_json::Value> {
-    let sessions = filter_by_date(collect_sessions(&state).await, &r);
+    let sessions = filter_by_date(&collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::summary(&sessions)).unwrap())
 }
 
@@ -46,7 +46,7 @@ async fn api_tokens_daily(
     State(state): State<Arc<AppState>>,
     Query(r): Query<DateRange>,
 ) -> Json<serde_json::Value> {
-    let sessions = filter_by_date(collect_sessions(&state).await, &r);
+    let sessions = filter_by_date(&collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::daily_tokens(&sessions)).unwrap())
 }
 
@@ -54,7 +54,7 @@ async fn api_tokens_by_model(
     State(state): State<Arc<AppState>>,
     Query(r): Query<DateRange>,
 ) -> Json<serde_json::Value> {
-    let sessions = filter_by_date(collect_sessions(&state).await, &r);
+    let sessions = filter_by_date(&collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::tokens_by_model(&sessions)).unwrap())
 }
 
@@ -62,7 +62,7 @@ async fn api_tools_usage(
     State(state): State<Arc<AppState>>,
     Query(r): Query<DateRange>,
 ) -> Json<serde_json::Value> {
-    let sessions = filter_by_date(collect_sessions(&state).await, &r);
+    let sessions = filter_by_date(&collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::tools_usage(&sessions)).unwrap())
 }
 
@@ -70,7 +70,7 @@ async fn api_projects(
     State(state): State<Arc<AppState>>,
     Query(r): Query<DateRange>,
 ) -> Json<serde_json::Value> {
-    let sessions = filter_by_date(collect_sessions(&state).await, &r);
+    let sessions = filter_by_date(&collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::projects(&sessions)).unwrap())
 }
 
@@ -78,7 +78,7 @@ async fn api_hosts(
     State(state): State<Arc<AppState>>,
     Query(r): Query<DateRange>,
 ) -> Json<serde_json::Value> {
-    let sessions = filter_by_date(collect_sessions(&state).await, &r);
+    let sessions = filter_by_date(&collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::hosts_summary(&sessions)).unwrap())
 }
 
@@ -86,7 +86,7 @@ async fn api_duration(
     State(state): State<Arc<AppState>>,
     Query(r): Query<DateRange>,
 ) -> Json<serde_json::Value> {
-    let sessions = filter_by_date(collect_sessions(&state).await, &r);
+    let sessions = filter_by_date(&collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::duration(&sessions)).unwrap())
 }
 
@@ -94,7 +94,7 @@ async fn api_activity_heatmap(
     State(state): State<Arc<AppState>>,
     Query(r): Query<DateRange>,
 ) -> Json<serde_json::Value> {
-    let sessions = filter_by_date(collect_sessions(&state).await, &r);
+    let sessions = filter_by_date(&collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::activity_heatmap(&sessions)).unwrap())
 }
 
@@ -102,7 +102,7 @@ async fn api_cost(
     State(state): State<Arc<AppState>>,
     Query(r): Query<DateRange>,
 ) -> Json<serde_json::Value> {
-    let sessions = filter_by_date(collect_sessions(&state).await, &r);
+    let sessions = filter_by_date(&collect_sessions(&state).await, &r);
     Json(
         serde_json::to_value(analytics::cost_breakdown(&sessions, state.pricing.as_ref())).unwrap(),
     )
@@ -112,7 +112,7 @@ async fn api_messages_latency(
     State(state): State<Arc<AppState>>,
     Query(r): Query<DateRange>,
 ) -> Json<serde_json::Value> {
-    let sessions = filter_by_date(collect_sessions(&state).await, &r);
+    let sessions = filter_by_date(&collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::messages_latency(&sessions)).unwrap())
 }
 
@@ -120,7 +120,7 @@ async fn api_tools_status(
     State(state): State<Arc<AppState>>,
     Query(r): Query<DateRange>,
 ) -> Json<serde_json::Value> {
-    let sessions = filter_by_date(collect_sessions(&state).await, &r);
+    let sessions = filter_by_date(&collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::tools_status(&sessions)).unwrap())
 }
 
@@ -128,7 +128,7 @@ async fn api_git_activity(
     State(state): State<Arc<AppState>>,
     Query(r): Query<DateRange>,
 ) -> Json<serde_json::Value> {
-    let sessions = filter_by_date(collect_sessions(&state).await, &r);
+    let sessions = filter_by_date(&collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::git_activity(&sessions)).unwrap())
 }
 
@@ -136,7 +136,7 @@ async fn api_directories(
     State(state): State<Arc<AppState>>,
     Query(r): Query<DateRange>,
 ) -> Json<serde_json::Value> {
-    let sessions = filter_by_date(collect_sessions(&state).await, &r);
+    let sessions = filter_by_date(&collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::directories(&sessions)).unwrap())
 }
 
@@ -151,7 +151,7 @@ async fn api_projector_usage_summary(
     State(state): State<Arc<AppState>>,
     Query(r): Query<DateRange>,
 ) -> Json<serde_json::Value> {
-    let sessions = filter_by_date(collect_sessions(&state).await, &r);
+    let sessions = filter_by_date(&collect_sessions(&state).await, &r);
     Json(serde_json::to_value(analytics::usage_summary(&sessions, state.pricing.as_ref())).unwrap())
 }
 
@@ -187,6 +187,22 @@ pub async fn serve(
     open_browser: bool,
 ) -> anyhow::Result<()> {
     let state = Arc::new(state);
+
+    // Warm session cache in the background so the first dashboard request hits hot memory.
+    {
+        let s = state.clone();
+        tokio::spawn(async move {
+            let t = std::time::Instant::now();
+            let _ = crate::query::collect_sessions(&s).await;
+            let sty = crate::cli::style();
+            eprintln!(
+                "  {green}✓{reset} {dim}cache warm in {:.2}s{reset}",
+                t.elapsed().as_secs_f64(),
+                green = sty.green, reset = sty.reset, dim = sty.dim,
+            );
+        });
+    }
+
     let app = Router::new()
         .route("/api/sessions", get(api_sessions))
         .route("/api/summary", get(api_summary))
