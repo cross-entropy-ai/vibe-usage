@@ -1,6 +1,7 @@
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { SortableHead, useSortable } from "@/components/ui/sortable-head";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtNum } from "@/lib/formatters";
@@ -14,8 +15,32 @@ function shortenRepo(repo: string) {
     .replace(/\.git$/, "");
 }
 
+type GitSortKey =
+  | "repo"
+  | "branches"
+  | "sessions"
+  | "messages"
+  | "tokens"
+  | "last_seen";
+
+function getGitValue(r: GitRepoStat, key: GitSortKey): string | number {
+  switch (key) {
+    case "repo": return shortenRepo(r.repo);
+    case "branches": return r.branches.length;
+    case "sessions": return r.sessions;
+    case "messages": return r.messages;
+    case "tokens": return r.input_tokens + r.output_tokens;
+    case "last_seen": return r.last_seen;
+  }
+}
+
 export function GitActivity({ data, limit = 20 }: { data: GitRepoStat[]; limit?: number }) {
-  const top = data.slice(0, limit);
+  const { sort, toggle, sorted } = useSortable<GitRepoStat, GitSortKey>(
+    data,
+    getGitValue,
+    { key: "sessions", dir: "desc" },
+  );
+  const top = sorted.slice(0, limit);
 
   return (
     <Card>
@@ -28,12 +53,12 @@ export function GitActivity({ data, limit = 20 }: { data: GitRepoStat[]; limit?:
           <TableHeader>
             <TableRow>
               <TableHead className="w-12">#</TableHead>
-              <TableHead>Repository</TableHead>
-              <TableHead>Branches</TableHead>
-              <TableHead className="text-right">Sessions</TableHead>
-              <TableHead className="text-right">Messages</TableHead>
-              <TableHead className="text-right">Tokens</TableHead>
-              <TableHead className="text-right">Last Active</TableHead>
+              <SortableHead sortKey="repo" sort={sort} onToggle={toggle}>Repository</SortableHead>
+              <SortableHead sortKey="branches" sort={sort} onToggle={toggle}>Branches</SortableHead>
+              <SortableHead sortKey="sessions" sort={sort} onToggle={toggle} align="right">Sessions</SortableHead>
+              <SortableHead sortKey="messages" sort={sort} onToggle={toggle} align="right">Messages</SortableHead>
+              <SortableHead sortKey="tokens" sort={sort} onToggle={toggle} align="right">Tokens</SortableHead>
+              <SortableHead sortKey="last_seen" sort={sort} onToggle={toggle} align="right">Last Active</SortableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

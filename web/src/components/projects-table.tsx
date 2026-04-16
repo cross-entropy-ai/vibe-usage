@@ -1,14 +1,47 @@
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { SortableHead, useSortable } from "@/components/ui/sortable-head";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toolColor, sortedToolEntries } from "@/lib/utils";
 import { fmtNum, fmtDurationMs } from "@/lib/formatters";
 import type { ProjectDetail } from "@/types";
 
+type ProjectSortKey =
+  | "name"
+  | "tools"
+  | "sessions"
+  | "messages"
+  | "tokens"
+  | "duration"
+  | "period";
+
+function sumValues(record: Record<string, number>): number {
+  let n = 0;
+  for (const v of Object.values(record)) n += v;
+  return n;
+}
+
+function getProjectValue(p: ProjectDetail, key: ProjectSortKey): string | number {
+  switch (key) {
+    case "name": return p.name;
+    case "tools": return sumValues(p.tools);
+    case "sessions": return p.sessions;
+    case "messages": return p.messages;
+    case "tokens": return p.input_tokens + p.output_tokens;
+    case "duration": return p.duration_ms;
+    case "period": return p.last_seen;
+  }
+}
+
 export function ProjectsTable({ data, limit = 20 }: { data: ProjectDetail[]; limit?: number }) {
-  const top = data.slice(0, limit);
+  const { sort, toggle, sorted } = useSortable<ProjectDetail, ProjectSortKey>(
+    data,
+    getProjectValue,
+    { key: "sessions", dir: "desc" },
+  );
+  const top = sorted.slice(0, limit);
 
   return (
     <Card>
@@ -21,13 +54,13 @@ export function ProjectsTable({ data, limit = 20 }: { data: ProjectDetail[]; lim
           <TableHeader>
             <TableRow>
               <TableHead className="w-12">#</TableHead>
-              <TableHead>Project</TableHead>
-              <TableHead>Tools</TableHead>
-              <TableHead className="text-right">Sessions</TableHead>
-              <TableHead className="text-right">Messages</TableHead>
-              <TableHead className="text-right">Tokens</TableHead>
-              <TableHead className="text-right">Duration</TableHead>
-              <TableHead className="text-right">Period</TableHead>
+              <SortableHead sortKey="name" sort={sort} onToggle={toggle}>Project</SortableHead>
+              <SortableHead sortKey="tools" sort={sort} onToggle={toggle}>Tools</SortableHead>
+              <SortableHead sortKey="sessions" sort={sort} onToggle={toggle} align="right">Sessions</SortableHead>
+              <SortableHead sortKey="messages" sort={sort} onToggle={toggle} align="right">Messages</SortableHead>
+              <SortableHead sortKey="tokens" sort={sort} onToggle={toggle} align="right">Tokens</SortableHead>
+              <SortableHead sortKey="duration" sort={sort} onToggle={toggle} align="right">Duration</SortableHead>
+              <SortableHead sortKey="period" sort={sort} onToggle={toggle} align="right">Period</SortableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

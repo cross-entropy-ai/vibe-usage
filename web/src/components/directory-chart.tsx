@@ -11,6 +11,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { SortableHead, useSortable } from "@/components/ui/sortable-head";
 import { Badge } from "@/components/ui/badge";
 import { toolColor, sortedToolEntries } from "@/lib/utils";
 import { fmtNum } from "@/lib/formatters";
@@ -20,6 +21,24 @@ const config = {
   sessions: { label: "Sessions", color: "var(--chart-1)" },
 } satisfies ChartConfig;
 
+type DirSortKey = "directory" | "sessions" | "messages" | "tokens" | "tools";
+
+function sumValues(record: Record<string, number>): number {
+  let n = 0;
+  for (const v of Object.values(record)) n += v;
+  return n;
+}
+
+function getDirValue(d: DirectoryStat, key: DirSortKey): string | number {
+  switch (key) {
+    case "directory": return d.directory;
+    case "sessions": return d.sessions;
+    case "messages": return d.messages;
+    case "tokens": return d.input_tokens + d.output_tokens;
+    case "tools": return sumValues(d.tools);
+  }
+}
+
 /** Keep the last 2 path segments and truncate to 25 chars. */
 function shortenDir(dir: string): string {
   const parts = dir.replace(/^~\//, "").replace(/\/$/, "").split("/");
@@ -28,6 +47,11 @@ function shortenDir(dir: string): string {
 }
 
 export function DirectoryChart({ data, limit = 15 }: { data: DirectoryStat[]; limit?: number }) {
+  const { sort, toggle, sorted } = useSortable<DirectoryStat, DirSortKey>(
+    data,
+    getDirValue,
+    { key: "sessions", dir: "desc" },
+  );
   const top = data.slice(0, limit).map((d) => ({
     ...d,
     shortDir: shortenDir(d.directory),
@@ -85,15 +109,15 @@ export function DirectoryChart({ data, limit = 15 }: { data: DirectoryStat[]; li
           <TableHeader>
             <TableRow>
               <TableHead className="w-12">#</TableHead>
-              <TableHead>Directory</TableHead>
-              <TableHead className="text-right">Sessions</TableHead>
-              <TableHead className="text-right">Messages</TableHead>
-              <TableHead className="text-right">Tokens</TableHead>
-              <TableHead>Tools</TableHead>
+              <SortableHead sortKey="directory" sort={sort} onToggle={toggle}>Directory</SortableHead>
+              <SortableHead sortKey="sessions" sort={sort} onToggle={toggle} align="right">Sessions</SortableHead>
+              <SortableHead sortKey="messages" sort={sort} onToggle={toggle} align="right">Messages</SortableHead>
+              <SortableHead sortKey="tokens" sort={sort} onToggle={toggle} align="right">Tokens</SortableHead>
+              <SortableHead sortKey="tools" sort={sort} onToggle={toggle}>Tools</SortableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((d, i) => (
+            {sorted.map((d, i) => (
               <TableRow key={d.directory}>
                 <TableCell className="font-mono text-muted-foreground">
                   {i + 1}
