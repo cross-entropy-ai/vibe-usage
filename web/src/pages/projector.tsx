@@ -75,7 +75,7 @@ export default function ProjectorPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
-              Usage Projector
+              Cost Projector
             </h1>
             <p className="mt-2 text-sm text-slate-600">
               Project your usage onto other models' pricing.
