@@ -125,12 +125,8 @@ pub fn summary(sessions: &[Session]) -> SummaryStats {
         .collect();
 
     let period = PeriodRange {
-        start: sessions
-            .first()
-            .map(|s| local_date(&s.start_time)),
-        end: sessions
-            .last()
-            .map(|s| local_date(&s.start_time)),
+        start: sessions.first().map(|s| local_date(&s.start_time)),
+        end: sessions.last().map(|s| local_date(&s.start_time)),
     };
 
     SummaryStats {

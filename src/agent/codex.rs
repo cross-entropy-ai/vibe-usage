@@ -71,7 +71,11 @@ mod tests {
         let agent = CodexAgent;
         let config = make_config("hello");
         let cmd = agent.build_command(&config);
-        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_string_lossy().to_string()).collect();
+        let args: Vec<_> = cmd
+            .as_std()
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
         assert_eq!(cmd.as_std().get_program().to_string_lossy(), "codex");
         assert_eq!(args[0], "exec");
         assert!(args.contains(&"hello".to_string()));
@@ -83,7 +87,11 @@ mod tests {
         let mut config = make_config("hello");
         config.model = Some("o3".to_string());
         let cmd = agent.build_command(&config);
-        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_string_lossy().to_string()).collect();
+        let args: Vec<_> = cmd
+            .as_std()
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
         assert!(args.contains(&"-m".to_string()));
         assert!(args.contains(&"o3".to_string()));
     }
@@ -94,7 +102,11 @@ mod tests {
         let mut config = make_config("do the thing");
         config.system_prompt = Some("you are helpful".to_string());
         let cmd = agent.build_command(&config);
-        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_string_lossy().to_string()).collect();
+        let args: Vec<_> = cmd
+            .as_std()
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
         let prompt_arg = args.last().unwrap();
         assert!(prompt_arg.starts_with("you are helpful"));
         assert!(prompt_arg.contains("do the thing"));
@@ -106,7 +118,11 @@ mod tests {
         let mut config = make_config("hello");
         config.cwd = Some(PathBuf::from("/tmp/project"));
         let cmd = agent.build_command(&config);
-        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_string_lossy().to_string()).collect();
+        let args: Vec<_> = cmd
+            .as_std()
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
         assert!(args.contains(&"-C".to_string()));
         assert!(args.contains(&"/tmp/project".to_string()));
     }
@@ -117,7 +133,11 @@ mod tests {
         let mut config = make_config("hello");
         config.extra_args = vec!["--full-auto".to_string()];
         let cmd = agent.build_command(&config);
-        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_string_lossy().to_string()).collect();
+        let args: Vec<_> = cmd
+            .as_std()
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
         assert!(args.contains(&"--full-auto".to_string()));
     }
 }

@@ -1,3 +1,5 @@
+#[allow(dead_code)]
+mod agent;
 mod analytics;
 mod collector;
 mod insights;
@@ -6,8 +8,6 @@ mod query;
 mod remote;
 mod schema;
 mod server;
-#[allow(dead_code)]
-mod agent;
 
 use std::path::PathBuf;
 
@@ -87,7 +87,11 @@ async fn main() -> Result<()> {
         Some(Command::Pull) => {
             remote::pull(&data_dir)?;
         }
-        Some(Command::Serve { port, host, no_browser }) => {
+        Some(Command::Serve {
+            port,
+            host,
+            no_browser,
+        }) => {
             do_sync(&collectors, &data_dir)?;
             let pricing = Box::new(pricing::PricingConfig::load(&data_dir));
             let state = query::AppState::new(collectors, data_dir, pricing);
@@ -151,7 +155,11 @@ fn do_parse(
                 Ok(result) => {
                     count += result.sessions.len();
                     all_warnings.extend(result.warnings);
-                    all_sessions.extend(result.sessions);
+                    let host = raw_dir
+                        .parent()
+                        .and_then(|p| p.file_name())
+                        .map(|n| n.to_string_lossy().to_string());
+                    all_sessions.extend(stamp_hostname(result.sessions, host));
                 }
                 Err(e) => eprintln!(" error in {}: {e}", raw_dir.display()),
             }
@@ -168,6 +176,16 @@ fn do_parse(
     }
     all_sessions.sort_by_key(|s| s.start_time);
     Ok(all_sessions)
+}
+
+fn stamp_hostname(
+    mut sessions: Vec<schema::Session>,
+    host: Option<String>,
+) -> Vec<schema::Session> {
+    for session in &mut sessions {
+        session.hostname = host.clone();
+    }
+    sessions
 }
 
 fn output_sessions(
@@ -218,5 +236,110 @@ fn print_summary(sessions: &[schema::Session]) {
     println!("\nTop projects:");
     for p in stats.top_projects.iter().take(15) {
         println!("  {:>4}  {}", p.sessions, p.name);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::fs;
+    use std::path::Path;
+    use std::sync::Mutex;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use anyhow::Result;
+    use chrono::Utc;
+
+    use crate::collector::{Collector, ParseResult};
+    use crate::schema::{Message, Role, Session, Tool};
+
+    struct StubCollector {
+        parse_result: Mutex<Option<ParseResult>>,
+    }
+
+    impl StubCollector {
+        fn new(parse_result: ParseResult) -> Self {
+            Self {
+                parse_result: Mutex::new(Some(parse_result)),
+            }
+        }
+    }
+
+    impl Collector for StubCollector {
+        fn name(&self) -> &str {
+            "stub"
+        }
+
+        fn source_dir(&self) -> &Path {
+            Path::new("/tmp")
+        }
+
+        fn glob_patterns(&self) -> Vec<&str> {
+            Vec::new()
+        }
+
+        fn parse(&self, _raw_dir: &Path) -> Result<ParseResult> {
+            Ok(self
+                .parse_result
+                .lock()
+                .unwrap()
+                .take()
+                .expect("stub parse result already consumed"))
+        }
+    }
+
+    fn temp_data_dir() -> PathBuf {
+        let uniq = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("vibe-usage-main-test-{uniq}"))
+    }
+
+    fn sample_session(hostname: Option<&str>) -> Session {
+        let timestamp = chrono::DateTime::parse_from_rfc3339("2024-01-02T03:04:05Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        Session {
+            id: "session-1".to_string(),
+            tool: Tool::Claude,
+            hostname: hostname.map(|h| h.to_string()),
+            project: None,
+            model: None,
+            start_time: timestamp,
+            end_time: None,
+            duration_ms: None,
+            cwd: None,
+            git: None,
+            messages: vec![Message {
+                role: Role::User,
+                content: "hello".to_string(),
+                timestamp,
+                model: None,
+                tokens: None,
+                duration_ms: None,
+                tool_calls: Vec::new(),
+            }],
+        }
+    }
+
+    #[test]
+    fn do_parse_stamps_hostname_from_raw_dir() {
+        let data_dir = temp_data_dir();
+        let raw_dir = data_dir.join("raw").join("host-a").join("stub");
+        fs::create_dir_all(&raw_dir).unwrap();
+
+        let collector = Box::new(StubCollector::new(ParseResult {
+            sessions: vec![sample_session(Some("wrong-host"))],
+            warnings: Vec::new(),
+        }));
+        let collectors: Vec<Box<dyn Collector + Send + Sync>> = vec![collector];
+
+        let sessions = do_parse(&collectors, &data_dir).unwrap();
+
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].hostname.as_deref(), Some("host-a"));
+        let _ = fs::remove_dir_all(&data_dir);
     }
 }

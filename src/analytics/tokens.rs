@@ -185,8 +185,9 @@ pub fn tools_status(sessions: &[Session]) -> Vec<ToolStatusStats> {
                 let entry = tool_map.entry(tc.name.clone()).or_default();
                 entry.0 += 1;
                 match tc.status.as_deref() {
-                    Some("error") => entry.2 += 1,
-                    _ => entry.1 += 1,
+                    Some(status) if is_explicit_success_status(status) => entry.1 += 1,
+                    Some(status) if is_explicit_error_status(status) => entry.2 += 1,
+                    _ => {}
                 }
             }
         }
@@ -203,4 +204,12 @@ pub fn tools_status(sessions: &[Session]) -> Vec<ToolStatusStats> {
         .collect();
     result.sort_by(|a, b| b.total.cmp(&a.total));
     result
+}
+
+fn is_explicit_success_status(status: &str) -> bool {
+    matches!(status, "success")
+}
+
+fn is_explicit_error_status(status: &str) -> bool {
+    matches!(status, "error")
 }

@@ -78,7 +78,11 @@ mod tests {
         let agent = GeminiAgent;
         let config = make_config("hello");
         let cmd = agent.build_command(&config);
-        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_string_lossy().to_string()).collect();
+        let args: Vec<_> = cmd
+            .as_std()
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
         assert_eq!(cmd.as_std().get_program().to_string_lossy(), "gemini");
         assert!(args.contains(&"-p".to_string()));
         assert!(args.contains(&"hello".to_string()));
@@ -90,7 +94,11 @@ mod tests {
         let mut config = make_config("hello");
         config.model = Some("gemini-2.5-pro".to_string());
         let cmd = agent.build_command(&config);
-        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_string_lossy().to_string()).collect();
+        let args: Vec<_> = cmd
+            .as_std()
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
         assert!(args.contains(&"--model".to_string()));
         assert!(args.contains(&"gemini-2.5-pro".to_string()));
     }
@@ -101,7 +109,11 @@ mod tests {
         let mut config = make_config("do the thing");
         config.system_prompt = Some("you are helpful".to_string());
         let cmd = agent.build_command(&config);
-        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_string_lossy().to_string()).collect();
+        let args: Vec<_> = cmd
+            .as_std()
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
         let p_idx = args.iter().position(|a| a == "-p").unwrap();
         let prompt_arg = &args[p_idx + 1];
         assert!(prompt_arg.starts_with("you are helpful"));
@@ -124,7 +136,11 @@ mod tests {
         let mut config = make_config("hello");
         config.allowed_tools = Some(vec!["shell".to_string(), "edit".to_string()]);
         let cmd = agent.build_command(&config);
-        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_string_lossy().to_string()).collect();
+        let args: Vec<_> = cmd
+            .as_std()
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
         assert!(args.contains(&"--allowed-tools".to_string()));
         assert!(args.contains(&"shell".to_string()));
         assert!(args.contains(&"edit".to_string()));
@@ -136,7 +152,11 @@ mod tests {
         let mut config = make_config("hello");
         config.extra_args = vec!["--yolo".to_string()];
         let cmd = agent.build_command(&config);
-        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_string_lossy().to_string()).collect();
+        let args: Vec<_> = cmd
+            .as_std()
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
         assert!(args.contains(&"--yolo".to_string()));
     }
 }

@@ -83,8 +83,12 @@ pub fn sync_collector(collector: &dyn Collector, data_dir: &Path) -> Result<Sync
             let needs_copy = match fs::metadata(&dest_path) {
                 Ok(dest_meta) => match fs::metadata(&src_path) {
                     Ok(src_meta) => {
-                        let src_mtime = src_meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                        let dest_mtime = dest_meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                        let src_mtime = src_meta
+                            .modified()
+                            .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                        let dest_mtime = dest_meta
+                            .modified()
+                            .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
                         src_mtime > dest_mtime
                     }
                     Err(e) => {
@@ -113,7 +117,11 @@ pub fn sync_collector(collector: &dyn Collector, data_dir: &Path) -> Result<Sync
         }
     }
 
-    Ok(SyncStats { copied, skipped, errors })
+    Ok(SyncStats {
+        copied,
+        skipped,
+        errors,
+    })
 }
 
 /// Build the raw_dir path for a given collector (for parsing).

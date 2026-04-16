@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
+use std::path::Path;
 
 use serde::Serialize;
 
@@ -112,18 +113,11 @@ pub fn projects(sessions: &[Session]) -> Vec<ProjectStats> {
 /// Per-cwd aggregation.
 pub fn directories(sessions: &[Session]) -> Vec<DirectoryStats> {
     let home = dirs::home_dir().unwrap_or_default();
-    let home_str = home.to_string_lossy();
 
     let mut dir_map: HashMap<String, DirectoryStats> = HashMap::new();
     for s in sessions {
         let cwd = match &s.cwd {
-            Some(c) => {
-                if c.starts_with(home_str.as_ref()) {
-                    format!("~{}", &c[home_str.len()..])
-                } else {
-                    c.clone()
-                }
-            }
+            Some(c) => shorten_home_dir(c, &home).unwrap_or_else(|| c.clone()),
             None => continue,
         };
 
@@ -151,6 +145,20 @@ pub fn directories(sessions: &[Session]) -> Vec<DirectoryStats> {
     let mut result: Vec<DirectoryStats> = dir_map.into_values().collect();
     result.sort_by(|a, b| b.sessions.cmp(&a.sessions));
     result
+}
+
+fn shorten_home_dir(cwd: &str, home: &Path) -> Option<String> {
+    if home.as_os_str().is_empty() {
+        return None;
+    }
+
+    let rest = Path::new(cwd).strip_prefix(home).ok()?;
+    let mut shortened = String::from("~");
+    if !rest.as_os_str().is_empty() {
+        shortened.push(std::path::MAIN_SEPARATOR);
+        shortened.push_str(&rest.to_string_lossy());
+    }
+    Some(shortened)
 }
 
 pub fn hosts_summary(sessions: &[Session]) -> Vec<HostStats> {
@@ -190,7 +198,12 @@ pub fn git_activity(sessions: &[Session]) -> Vec<GitRepoStats> {
             Some(g) => g,
             None => continue,
         };
-        let repo_key = match git.repo_url.as_deref().or(git.branch.as_deref()) {
+        let repo_key = match git
+            .repo_url
+            .as_deref()
+            .filter(|v| !v.is_empty())
+            .or_else(|| s.cwd.as_deref().filter(|v| !v.is_empty()))
+        {
             Some(k) => k.to_string(),
             None => continue,
         };
@@ -266,4 +279,78 @@ pub fn project_lifecycle(sessions: &[Session]) -> Vec<ProjectLifecycleEntry> {
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::schema::{GitContext, Tool};
+    use chrono::{TimeZone, Utc};
+
+    fn session(
+        id: &str,
+        cwd: Option<&str>,
+        repo_url: Option<&str>,
+        branch: Option<&str>,
+    ) -> Session {
+        Session {
+            id: id.to_string(),
+            tool: Tool::Claude,
+            hostname: None,
+            project: None,
+            model: None,
+            start_time: Utc.with_ymd_and_hms(2026, 4, 16, 12, 0, 0).unwrap(),
+            end_time: None,
+            duration_ms: None,
+            cwd: cwd.map(|v| v.to_string()),
+            git: Some(GitContext {
+                branch: branch.map(|v| v.to_string()),
+                commit: None,
+                repo_url: repo_url.map(|v| v.to_string()),
+            }),
+            messages: vec![],
+        }
+    }
+
+    #[test]
+    fn git_activity_separates_sessions_by_cwd_when_repo_url_is_missing() {
+        let sessions = vec![
+            session("1", Some("/Users/alice/repo-a"), None, Some("main")),
+            session("2", Some("/Users/alice/repo-b"), None, Some("main")),
+        ];
+
+        let stats = git_activity(&sessions);
+
+        assert_eq!(stats.len(), 2);
+        let repos: Vec<_> = stats.iter().map(|s| s.repo.as_str()).collect();
+        assert!(repos.contains(&"/Users/alice/repo-a"));
+        assert!(repos.contains(&"/Users/alice/repo-b"));
+    }
+
+    #[test]
+    fn git_activity_prefers_repo_url_over_branch_and_cwd() {
+        let sessions = vec![
+            session(
+                "1",
+                Some("/tmp/repo-a"),
+                Some("https://example.com/org/repo.git"),
+                Some("main"),
+            ),
+            session(
+                "2",
+                Some("/tmp/repo-b"),
+                Some("https://example.com/org/repo.git"),
+                Some("feature"),
+            ),
+        ];
+
+        let stats = git_activity(&sessions);
+
+        assert_eq!(stats.len(), 1);
+        assert_eq!(stats[0].repo, "https://example.com/org/repo.git");
+        assert_eq!(stats[0].branches.len(), 2);
+        assert!(stats[0].branches.contains(&"main".to_string()));
+        assert!(stats[0].branches.contains(&"feature".to_string()));
+    }
 }

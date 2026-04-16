@@ -58,8 +58,9 @@ pub struct DailyCost {
 
 /// Full cost analysis.
 pub fn cost_breakdown(sessions: &[Session], pricing: &dyn PricingProvider) -> CostBreakdown {
-    // Per (date, model): all costs calculated at API rate
-    let mut by_model_map: HashMap<(String, String), (u64, u64, u64, u64, u64, String)> =
+    // Per (date, model, tool): all costs calculated at API rate.
+    // Include tool in the key so rows stay distinct when multiple tools share a model on one day.
+    let mut by_model_map: HashMap<(String, String, String), (u64, u64, u64, u64, u64)> =
         HashMap::new();
     for s in sessions {
         let tool = s.tool.to_string();
@@ -72,8 +73,8 @@ pub fn cost_breakdown(sessions: &[Session], pricing: &dyn PricingProvider) -> Co
                 .unwrap_or("unknown")
                 .to_string();
             let entry = by_model_map
-                .entry((day.clone(), model))
-                .or_insert_with(|| (0, 0, 0, 0, 0, tool.clone()));
+                .entry((day.clone(), model, tool.clone()))
+                .or_insert_with(|| (0, 0, 0, 0, 0));
             if let Some(t) = &m.tokens {
                 entry.0 += t.input.unwrap_or(0);
                 entry.1 += t.output.unwrap_or(0);
@@ -86,7 +87,7 @@ pub fn cost_breakdown(sessions: &[Session], pricing: &dyn PricingProvider) -> Co
 
     let mut total_equiv = 0.0f64;
     let mut model_costs: Vec<ModelCost> = Vec::new();
-    for ((date, model), (inp, out, think, cr, cw, tool)) in &by_model_map {
+    for ((date, model, tool), (inp, out, think, cr, cw)) in &by_model_map {
         let equiv = pricing
             .price_for(model)
             .map(|p| pricing::calculate_cost(&p, *inp, *out, *think, *cr, *cw))
@@ -234,5 +235,98 @@ pub fn cost_breakdown(sessions: &[Session], pricing: &dyn PricingProvider) -> Co
         by_model: model_costs,
         by_tool,
         daily,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::schema::{Message, Role, Session, TokenUsage, Tool};
+    use chrono::{TimeZone, Utc};
+
+    struct MockPricing;
+
+    impl PricingProvider for MockPricing {
+        fn price_for(&self, model: &str) -> Option<crate::pricing::ModelPrice> {
+            if model == "shared-model" {
+                Some(crate::pricing::ModelPrice {
+                    input: 1.0,
+                    output: 2.0,
+                    cached_input: 0.5,
+                    cache_write: 3.0,
+                })
+            } else {
+                None
+            }
+        }
+
+        fn is_subscription(&self, _tool: &str) -> bool {
+            false
+        }
+
+        fn subscription_for(&self, _tool: &str) -> Option<&crate::pricing::Subscription> {
+            None
+        }
+
+        fn subscription_months(&self, _tool: &str, _first_date: &str, _last_date: &str) -> f64 {
+            0.0
+        }
+    }
+
+    fn message(model: Option<&str>, input: u64) -> Message {
+        Message {
+            role: Role::Assistant,
+            content: String::new(),
+            timestamp: Utc.with_ymd_and_hms(2026, 4, 15, 12, 0, 0).unwrap(),
+            model: model.map(|m| m.to_string()),
+            tokens: Some(TokenUsage {
+                input: Some(input),
+                output: Some(0),
+                thinking: Some(0),
+                cache_read: Some(0),
+                cache_write: Some(0),
+            }),
+            duration_ms: None,
+            tool_calls: vec![],
+        }
+    }
+
+    fn session(id: &str, tool: Tool, input: u64) -> Session {
+        Session {
+            id: id.to_string(),
+            tool,
+            hostname: None,
+            project: None,
+            model: Some("shared-model".to_string()),
+            start_time: Utc.with_ymd_and_hms(2026, 4, 15, 10, 0, 0).unwrap(),
+            end_time: None,
+            duration_ms: None,
+            cwd: None,
+            git: None,
+            messages: vec![message(None, input)],
+        }
+    }
+
+    #[test]
+    fn by_model_rows_stay_separate_per_tool() {
+        let sessions = vec![
+            session("claude-1", Tool::Claude, 10),
+            session("codex-1", Tool::Codex, 20),
+        ];
+
+        let breakdown = cost_breakdown(&sessions, &MockPricing);
+
+        assert_eq!(breakdown.by_model.len(), 2);
+
+        let mut rows = breakdown.by_model;
+        rows.sort_by(|a, b| a.tool.cmp(&b.tool));
+
+        assert_eq!(rows[0].tool, "claude");
+        assert_eq!(rows[0].model, "shared-model");
+        assert_eq!(rows[0].input_tokens, 10);
+        assert_eq!(rows[1].tool, "codex");
+        assert_eq!(rows[1].model, "shared-model");
+        assert_eq!(rows[1].input_tokens, 20);
     }
 }
