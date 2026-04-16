@@ -62,6 +62,11 @@ jobs:
           npm ci
           npm run build
 
+      - name: Fetch model pricing data
+        run: |
+          curl -sSfL -o model_prices.json \
+            "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
+
       - name: Install cross-compilation tools
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
