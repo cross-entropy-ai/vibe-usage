@@ -4,6 +4,67 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Usage Stats</title>
+    <script>
+      (function () {
+        if (window.location.pathname !== "/") return;
+        function fmt(d) {
+          var y = d.getFullYear();
+          var m = String(d.getMonth() + 1).padStart(2, "0");
+          var day = String(d.getDate()).padStart(2, "0");
+          return y + "-" + m + "-" + day;
+        }
+        function rangeFor(win) {
+          if (win === "all") return null;
+          var today = new Date();
+          today.setHours(0, 0, 0, 0);
+          var to = fmt(today);
+          var cutoff = new Date(today);
+          if (win === "half-year") cutoff.setMonth(cutoff.getMonth() - 6);
+          else if (win === "full-year") cutoff.setFullYear(cutoff.getFullYear() - 1);
+          else {
+            var days = win === "24h" ? 1 : win === "7day" ? 7 : win === "14day" ? 14 : win === "30day" ? 30 : 90;
+            cutoff.setDate(cutoff.getDate() - (days - 1));
+          }
+          return { from: fmt(cutoff), to: to };
+        }
+        var VALID = ["24h", "7day", "14day", "30day", "90day", "half-year", "full-year", "all"];
+        var raw = new URLSearchParams(window.location.search).get("window") || "full-year";
+        var win = VALID.indexOf(raw) >= 0 ? raw : "full-year";
+        var r = rangeFor(win);
+        var qs = r ? "?from=" + encodeURIComponent(r.from) + "&to=" + encodeURIComponent(r.to) : "";
+        var endpoints = [
+          "/api/summary",
+          "/api/tokens/by-model",
+          "/api/tools/usage",
+          "/api/projects",
+          "/api/hosts",
+          "/api/duration",
+          "/api/activity/heatmap",
+          "/api/cost",
+          "/api/tokens/daily",
+          "/api/messages/latency",
+          "/api/tools/status",
+          "/api/git/activity",
+          "/api/directories",
+          "/api/insights/conversations",
+          "/api/insights/cache-efficiency",
+          "/api/insights/thinking",
+          "/api/insights/toolchains",
+          "/api/insights/model-switches",
+          "/api/insights/languages",
+          "/api/insights/session-complexity",
+        ];
+        var cache = {};
+        for (var i = 0; i < endpoints.length; i++) {
+          var url = endpoints[i] + qs;
+          cache[url] = fetch(url).then(function (res) {
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            return res.json();
+          });
+        }
+        window.__API_CACHE__ = cache;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

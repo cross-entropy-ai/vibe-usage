@@ -28,8 +28,24 @@ export interface DataSource {
   fetch<T>(path: string, signal: AbortSignal): Promise<T>;
 }
 
+declare global {
+  interface Window {
+    __API_CACHE__?: Record<string, Promise<unknown>>;
+  }
+}
+
 export const httpSource: DataSource = {
   async fetch<T>(path: string, signal: AbortSignal): Promise<T> {
+    const cache = window.__API_CACHE__;
+    const cached = cache?.[path];
+    if (cached) {
+      delete cache![path];
+      try {
+        return (await cached) as T;
+      } catch {
+        // fall through to fresh fetch
+      }
+    }
     const r = await globalThis.fetch(path, { signal });
     if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
     return r.json();
@@ -88,6 +104,15 @@ export interface DashboardData {
 export interface DateRange {
   from?: string;
   to?: string;
+}
+
+export function summarizeErrors(errors: string[]): string[] {
+  if (errors.length === 0) return [];
+  const unique = Array.from(new Set(errors));
+  if (unique.every((e) => e.includes("Failed to fetch"))) {
+    return ["Unable to reach the server. Check that the backend is running."];
+  }
+  return unique;
 }
 
 export async function fetchDashboardData(

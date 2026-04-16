@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import type { ProjectorModelsResponse, UsageSummary } from "@/types/projector";
 import type { DateRange } from "@/lib/api";
 
@@ -7,6 +7,7 @@ export function useProjectorData(dateRange?: DateRange) {
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<string[]>([]);
+  const [reloadTick, setReloadTick] = useState(0);
   const hasData = useRef(false);
 
   const from = dateRange?.from;
@@ -44,7 +45,9 @@ export function useProjectorData(dateRange?: DateRange) {
     });
 
     return () => controller.abort();
-  }, [from, to]);
+  }, [from, to, reloadTick]);
 
-  return { models, usage, loading, errors, initialLoad: loading && !hasData.current };
+  const refetch = useCallback(() => setReloadTick((n) => n + 1), []);
+
+  return { models, usage, loading, errors, initialLoad: loading && !hasData.current, refetch };
 }

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { useSearchParamState } from "@/hooks/use-search-param-state";
 import type { DateRange } from "@/lib/api";
+import { ConnectionErrorDialog } from "@/components/connection-error-dialog";
 import {
   SummaryProvider,
   CostProvider,
@@ -30,36 +31,10 @@ import { fmtNum } from "@/lib/formatters";
 import { TOOL_NAMES, type Tool } from "@/lib/tools";
 import type { Summary } from "@/types";
 
-function DashboardFallback({ loading, errors }: { loading: boolean; errors: string[] }) {
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-muted-foreground">Loading…</p>
-      </div>
-    );
-  }
-
+function LoadingScreen({ message }: { message: string }) {
   return (
     <div className="flex items-center justify-center min-h-screen">
-      <div className="text-center space-y-2">
-        <p className="text-destructive">Failed to load dashboard data</p>
-        {errors.map((e, i) => (
-          <p key={i} className="text-destructive text-sm">{e}</p>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ErrorBanner({ errors }: { errors: string[] }) {
-  if (errors.length === 0) return null;
-
-  return (
-    <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-      Some data failed to load:{" "}
-      {errors.map((e, i) => (
-        <span key={i}>{i > 0 ? "; " : ""}{e}</span>
-      ))}
+      <p className="text-muted-foreground">{message}</p>
     </div>
   );
 }
@@ -129,7 +104,7 @@ function Dashboard() {
   const [toolLens, setToolLens] = useSearchParamState<ToolLens>("tool", "all", TOOL_LENS_VALUES);
 
   const dateRange = useMemo(() => trendWindowToDateRange(trendWindow), [trendWindow]);
-  const { data, errors, loading, initialLoad } = useDashboardData(dateRange);
+  const { data, errors, loading, initialLoad, refetch } = useDashboardData(dateRange);
 
   const filteredSummary = useMemo(() => {
     if (!data?.summary) return null;
@@ -174,8 +149,17 @@ function Dashboard() {
     [filteredSummary],
   );
 
-  if (initialLoad || !data || Object.values(data).every((v) => v === null)) {
-    return <DashboardFallback loading={initialLoad} errors={errors} />;
+  if (initialLoad) {
+    return <LoadingScreen message="Loading…" />;
+  }
+
+  if (!data || Object.values(data).every((v) => v === null)) {
+    return (
+      <>
+        <LoadingScreen message="No data available." />
+        <ConnectionErrorDialog errors={errors} onRetry={refetch} retrying={loading} />
+      </>
+    );
   }
 
   return (
@@ -202,7 +186,6 @@ function Dashboard() {
             onToolLensChange={setToolLens}
           />
 
-          <ErrorBanner errors={errors} />
           <SectionNav />
 
         {composeProviders(
@@ -359,6 +342,7 @@ function Dashboard() {
         )}
         </div>
       </div>
+      <ConnectionErrorDialog errors={errors} onRetry={refetch} retrying={loading} />
     </div>
   );
 }

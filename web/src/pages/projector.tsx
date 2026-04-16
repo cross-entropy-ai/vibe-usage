@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ManualCalculator } from "@/components/projector/manual-calculator";
 import { PriceReference } from "@/components/projector/price-reference";
 import type { DateRange } from "@/lib/api";
+import { ConnectionErrorDialog } from "@/components/connection-error-dialog";
 
 const TREND_WINDOWS = ["7day", "14day", "30day", "90day", "all"] as const;
 type TrendWindow = (typeof TREND_WINDOWS)[number];
@@ -44,7 +45,7 @@ export default function ProjectorPage() {
     }, { replace: true });
   }, [setSearchParams]);
   const dateRange = useMemo(() => trendWindowToDateRange(trendWindow), [trendWindow]);
-  const { models, usage, loading, errors, initialLoad } = useProjectorData(dateRange);
+  const { models, usage, loading, errors, initialLoad, refetch } = useProjectorData(dateRange);
 
   const [providerFilter, setProviderFilter] = useState("all");
   const [tableSort, setTableSort] = useState<SortState>({ key: "cost", asc: true });
@@ -97,12 +98,6 @@ export default function ProjectorPage() {
             ← Dashboard
           </Link>
         </div>
-
-        {errors.length > 0 && (
-          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-            {errors.join("; ")}
-          </div>
-        )}
 
         {/* Filters */}
         <div className="space-y-3">
@@ -190,6 +185,7 @@ export default function ProjectorPage() {
           <PriceReference models={models.models} />
         )}
       </div>
+      <ConnectionErrorDialog errors={errors} onRetry={refetch} retrying={loading} />
     </div>
   );
 }
