@@ -200,7 +200,11 @@ pub async fn serve(
         Ok(l) => l,
         Err(_) => {
             let fallback = std::net::SocketAddr::from((ip, 0u16));
-            eprintln!("Port {port} is busy, finding an available port...");
+            let s = crate::cli::style();
+            eprintln!(
+                "  {yellow}Port {port} is busy, finding an available port…{reset}",
+                yellow = s.yellow, reset = s.reset
+            );
             tokio::net::TcpListener::bind(fallback).await?
         }
     };
@@ -208,15 +212,29 @@ pub async fn serve(
     let actual_addr = listener.local_addr()?;
     let actual_port = actual_addr.port();
 
-    eprintln!("Listening on {actual_addr}");
+    let s = crate::cli::style();
+    eprintln!();
+    eprintln!(
+        "  {bold}Listening{reset} on {addr}",
+        bold = s.bold, reset = s.reset, addr = actual_addr
+    );
     let url = if ip.is_unspecified() {
-        eprintln!("  http://localhost:{actual_port}");
+        eprintln!(
+            "    {dim}→{reset} {cyan}http://localhost:{port}{reset}",
+            dim = s.dim, reset = s.reset, cyan = s.cyan, port = actual_port
+        );
         if let Some(lip) = local_ip() {
-            eprintln!("  http://{lip}:{actual_port}");
+            eprintln!(
+                "    {dim}→{reset} {cyan}http://{lip}:{port}{reset}",
+                dim = s.dim, reset = s.reset, cyan = s.cyan, port = actual_port
+            );
         }
         format!("http://localhost:{actual_port}")
     } else {
-        eprintln!("  http://{actual_addr}");
+        eprintln!(
+            "    {dim}→{reset} {cyan}http://{addr}{reset}",
+            dim = s.dim, reset = s.reset, cyan = s.cyan, addr = actual_addr
+        );
         format!("http://{actual_addr}")
     };
 

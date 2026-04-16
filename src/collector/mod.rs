@@ -175,7 +175,11 @@ pub fn build_collectors(tools: &Option<Vec<String>>) -> Vec<Box<dyn Collector + 
         .filter_map(|name| {
             let c = create_collector(name);
             if c.is_none() {
-                eprintln!("unknown tool: {name}");
+                let s = crate::cli::style();
+                eprintln!(
+                    "  {yellow}unknown tool:{reset} {name}",
+                    yellow = s.yellow, reset = s.reset
+                );
             }
             c
         })

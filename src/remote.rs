@@ -40,7 +40,11 @@ pub fn push(data_dir: &Path) -> Result<()> {
     let src = format!("{}/", local.display());
     let dest = format!("{}/raw/{}/", config.remote, host);
 
-    eprintln!("pushing {} → {}", src, dest);
+    let s = crate::cli::style();
+    eprintln!(
+        "  {dim}pushing{reset} {src} {dim}→{reset} {dest}",
+        dim = s.dim, reset = s.reset
+    );
 
     // --rsync-path trick: create remote dir before transfer (macOS rsync lacks --mkpath)
     let (_remote_host, remote_path) = dest.split_once(':').context("invalid remote format")?;
@@ -62,7 +66,10 @@ pub fn push(data_dir: &Path) -> Result<()> {
         bail!("rsync failed with exit code {:?}", status.code());
     }
 
-    eprintln!("push complete");
+    eprintln!(
+        "  {green}✓{reset} {bold}push complete{reset}",
+        green = s.green, bold = s.bold, reset = s.reset
+    );
     Ok(())
 }
 
@@ -76,7 +83,11 @@ pub fn pull(data_dir: &Path) -> Result<()> {
     let src = format!("{}/raw/", config.remote);
     let dest = format!("{}/", local_raw.display());
 
-    eprintln!("pulling {} → {}", src, dest);
+    let s = crate::cli::style();
+    eprintln!(
+        "  {dim}pulling{reset} {src} {dim}→{reset} {dest}",
+        dim = s.dim, reset = s.reset
+    );
 
     let status = Command::new("rsync")
         .args(["-az", "--progress", &src, &dest])
@@ -87,6 +98,9 @@ pub fn pull(data_dir: &Path) -> Result<()> {
         bail!("rsync failed with exit code {:?}", status.code());
     }
 
-    eprintln!("pull complete");
+    eprintln!(
+        "  {green}✓{reset} {bold}pull complete{reset}",
+        green = s.green, bold = s.bold, reset = s.reset
+    );
     Ok(())
 }
