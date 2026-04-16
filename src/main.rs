@@ -4,6 +4,7 @@ mod analytics;
 mod cli;
 mod collector;
 mod insights;
+mod litellm;
 mod pricing;
 mod query;
 mod remote;
