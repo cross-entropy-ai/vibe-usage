@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useProjectorData } from "@/hooks/use-projector-data";
 import { useSearchParamState } from "@/hooks/use-search-param-state";
@@ -36,10 +36,18 @@ export default function ProjectorPage() {
   const dateRange = useMemo(() => trendWindowToDateRange(trendWindow), [trendWindow]);
   const { models, usage, loading, errors, initialLoad } = useProjectorData(dateRange);
 
+  const [providerFilter, setProviderFilter] = useState("all");
+
   const projection = useMemo(() => {
     if (!models || !usage) return null;
     return projectUsage(models.models, usage.totals.with_cache, usage.totals.without_cache);
   }, [models, usage]);
+
+  const providers = useMemo(() => {
+    if (!projection) return [];
+    const set = new Set(projection.map((d) => d.provider));
+    return ["all", ...Array.from(set).sort()];
+  }, [projection]);
 
   const currentModels = useMemo(() => {
     if (!usage) return [];
@@ -85,20 +93,44 @@ export default function ProjectorPage() {
           </div>
         )}
 
-        {/* Period selector */}
-        <div className="flex flex-wrap gap-1.5">
-          {TREND_WINDOWS.map((w) => (
-            <Button
-              key={w}
-              type="button"
-              size="xs"
-              variant={trendWindow === w ? "default" : "outline"}
-              className={trendWindow === w ? "bg-slate-950 text-white hover:bg-slate-900" : "bg-white"}
-              onClick={() => setTrendWindow(w)}
-            >
-              {w === "all" ? "All" : w.toUpperCase()}
-            </Button>
-          ))}
+        {/* Filters */}
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Trend Window</p>
+            <div className="flex flex-wrap gap-1.5">
+              {TREND_WINDOWS.map((w) => (
+                <Button
+                  key={w}
+                  type="button"
+                  size="xs"
+                  variant={trendWindow === w ? "default" : "outline"}
+                  className={trendWindow === w ? "bg-slate-950 text-white hover:bg-slate-900" : "bg-white"}
+                  onClick={() => setTrendWindow(w)}
+                >
+                  {w === "all" ? "All" : w.toUpperCase()}
+                </Button>
+              ))}
+            </div>
+          </div>
+          {providers.length > 2 && (
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Provider</p>
+              <div className="flex flex-wrap gap-1.5">
+                {providers.map((p) => (
+                  <Button
+                    key={p}
+                    type="button"
+                    size="xs"
+                    variant={providerFilter === p ? "default" : "outline"}
+                    className={providerFilter === p ? "bg-slate-950 text-white hover:bg-slate-900" : "bg-white"}
+                    onClick={() => setProviderFilter(p)}
+                  >
+                    {p === "all" ? "All" : p}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Historical Projection */}
@@ -116,25 +148,27 @@ export default function ProjectorPage() {
               <ProjectionTable
                 data={projection}
                 mode="with_cache"
+                providerFilter={providerFilter}
                 currentModels={currentModels}
                 currentCost={currentCost}
               />
               <ProjectionTable
                 data={projection}
                 mode="without_cache"
+                providerFilter={providerFilter}
                 currentModels={currentModels}
                 currentCost={currentCost}
               />
             </div>
             <div className="grid gap-4 lg:grid-cols-2">
-              <ProjectionChart data={projection} mode="with_cache" />
-              <ProjectionChart data={projection} mode="without_cache" />
+              <ProjectionChart data={projection} mode="with_cache" providerFilter={providerFilter} />
+              <ProjectionChart data={projection} mode="without_cache" providerFilter={providerFilter} />
             </div>
           </section>
         )}
 
         {models && (
-          <ManualCalculator models={models.models} />
+          <ManualCalculator models={models.models} providerFilter={providerFilter} />
         )}
 
         {models && (

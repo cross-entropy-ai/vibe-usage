@@ -32,9 +32,10 @@ function TokenInput({
 
 interface Props {
   models: ProjectorModel[];
+  providerFilter: string;
 }
 
-export function ManualCalculator({ models }: Props) {
+export function ManualCalculator({ models, providerFilter }: Props) {
   const [input, setInput] = useState(0);
   const [output, setOutput] = useState(0);
   const [thinking, setThinking] = useState(0);
@@ -94,12 +95,12 @@ export function ManualCalculator({ models }: Props) {
       {projection && (
         <>
           <div className="grid gap-4 lg:grid-cols-2">
-            <ProjectionTable data={projection} mode="with_cache" currentModels={[]} currentCost={0} />
-            <ProjectionTable data={projection} mode="without_cache" currentModels={[]} currentCost={0} />
+            <ProjectionTable data={projection} mode="with_cache" providerFilter={providerFilter} currentModels={[]} currentCost={0} />
+            <ProjectionTable data={projection} mode="without_cache" providerFilter={providerFilter} currentModels={[]} currentCost={0} />
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
-            <ProjectionChart data={projection} mode="with_cache" />
-            <ProjectionChart data={projection} mode="without_cache" />
+            <ProjectionChart data={projection} mode="with_cache" providerFilter={providerFilter} />
+            <ProjectionChart data={projection} mode="without_cache" providerFilter={providerFilter} />
           </div>
         </>
       )}

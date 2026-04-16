@@ -18,17 +18,20 @@ const MODE_CONFIG: Record<CostMode, { key: string; label: string; color: string 
 interface Props {
   data: ProjectionResult[];
   mode: CostMode;
+  providerFilter: string;
   limit?: number;
 }
 
-export function ProjectionChart({ data, mode, limit = 15 }: Props) {
+export function ProjectionChart({ data, mode, providerFilter, limit = 15 }: Props) {
   const modeInfo = MODE_CONFIG[mode];
 
   const config = {
     [modeInfo.key]: { label: modeInfo.label, color: modeInfo.color },
   } satisfies ChartConfig;
 
-  const sorted = [...data].sort((a, b) => {
+  const filtered = providerFilter === "all" ? data : data.filter((d) => d.provider === providerFilter);
+
+  const sorted = [...filtered].sort((a, b) => {
     const costA = mode === "with_cache" ? a.cost_with_cache : a.cost_without_cache;
     const costB = mode === "with_cache" ? b.cost_with_cache : b.cost_without_cache;
     return costA - costB;

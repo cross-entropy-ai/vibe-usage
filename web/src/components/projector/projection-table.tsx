@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { fmtUsd } from "@/lib/formatters";
 import type { ProjectionResult } from "@/lib/projector-calc";
 
@@ -9,6 +8,7 @@ export type CostMode = "with_cache" | "without_cache";
 interface Props {
   data: ProjectionResult[];
   mode: CostMode;
+  providerFilter: string;
   currentModels: string[];
   currentCost: number;
 }
@@ -20,15 +20,9 @@ const MODE_LABELS: Record<CostMode, { title: string; description: string }> = {
 
 type SortKey = "model" | "provider" | "cost" | "diff";
 
-export function ProjectionTable({ data, mode, currentModels, currentCost }: Props) {
-  const [providerFilter, setProviderFilter] = useState<string>("all");
+export function ProjectionTable({ data, mode, providerFilter, currentModels, currentCost }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("cost");
   const [sortAsc, setSortAsc] = useState(true);
-
-  const providers = useMemo(() => {
-    const set = new Set(data.map((d) => d.provider));
-    return ["all", ...Array.from(set).sort()];
-  }, [data]);
 
   const costOf = (row: ProjectionResult) =>
     mode === "with_cache" ? row.cost_with_cache : row.cost_without_cache;
@@ -70,20 +64,6 @@ export function ProjectionTable({ data, mode, currentModels, currentCost }: Prop
       <CardHeader>
         <CardTitle className="text-base">{label.title}</CardTitle>
         <CardDescription>{label.description}</CardDescription>
-        <div className="flex flex-wrap gap-1.5 mt-2">
-          {providers.map((p) => (
-            <Button
-              key={p}
-              type="button"
-              size="xs"
-              variant={providerFilter === p ? "default" : "outline"}
-              className={providerFilter === p ? "bg-slate-950 text-white hover:bg-slate-900" : "bg-white"}
-              onClick={() => setProviderFilter(p)}
-            >
-              {p === "all" ? "All" : p}
-            </Button>
-          ))}
-        </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
