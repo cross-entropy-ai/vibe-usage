@@ -7,7 +7,6 @@ import { ProjectionChart } from "@/components/projector/projection-chart";
 import { Button } from "@/components/ui/button";
 import { ManualCalculator } from "@/components/projector/manual-calculator";
 import { PriceReference } from "@/components/projector/price-reference";
-import { fmtUsd, fmtNum } from "@/lib/formatters";
 import type { DateRange } from "@/lib/api";
 
 const TREND_WINDOWS = ["7day", "14day", "30day", "90day", "all"] as const;
@@ -98,25 +97,6 @@ export default function ProjectorPage() {
             ← Dashboard
           </Link>
         </div>
-
-        {usage && (() => {
-          const totalCost = usage.by_model.reduce((s, m) => s + m.equivalent_api_cost, 0);
-          const t = usage.totals.with_cache;
-          const totalTokens = t.input_tokens + t.output_tokens + t.thinking_tokens + t.cache_read_tokens + t.cache_write_tokens;
-          return (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {[
-                { label: "Equivalent API Cost", value: fmtUsd(totalCost) },
-                { label: "Total Tokens", value: fmtNum(totalTokens) },
-              ].map((item) => (
-                <div key={item.label} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{item.label}</span>
-                  <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{item.value}</div>
-                </div>
-              ))}
-            </div>
-          );
-        })()}
 
         {errors.length > 0 && (
           <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
