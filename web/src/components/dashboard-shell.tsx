@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import {
   Activity,
   Bot,
@@ -172,6 +173,14 @@ export function DashboardHeader({
                 Cost, throughput, runtime behavior, and workspace concentration
                 for coding agents across Claude, Gemini, Codex, and Kimi.
               </CardDescription>
+              <div className="mt-3">
+                <Link
+                  to="/projector"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900"
+                >
+                  Usage Projector →
+                </Link>
+              </div>
             </div>
           </div>
 
