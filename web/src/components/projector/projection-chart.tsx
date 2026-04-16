@@ -36,7 +36,7 @@ export function ProjectionChart({ data, mode, limit = 15 }: Props) {
 
   const top = sorted.slice(0, limit).map((d) => ({
     ...d,
-    model: d.model.replace(/-\d{8}$/, "").slice(0, 24),
+    model: d.model.replace(/-\d{8}$/, ""),
   }));
 
   return (
@@ -52,7 +52,7 @@ export function ProjectionChart({ data, mode, limit = 15 }: Props) {
             <YAxis
               dataKey="model"
               type="category"
-              width={160}
+              width={200}
               tick={{ fontSize: 11 }}
               tickLine={false}
               axisLine={false}
