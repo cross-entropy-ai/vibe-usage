@@ -251,10 +251,10 @@ mod tests {
         fn price_for(&self, model: &str) -> Option<crate::pricing::ModelPrice> {
             if model == "shared-model" {
                 Some(crate::pricing::ModelPrice {
-                    input: 1.0,
-                    output: 2.0,
-                    cached_input: 0.5,
-                    cache_write: 3.0,
+                    input_cost_per_token: 1.0e-6,
+                    output_cost_per_token: 2.0e-6,
+                    cache_read_input_token_cost: 0.5e-6,
+                    cache_creation_input_token_cost: 3.0e-6,
                 })
             } else {
                 None

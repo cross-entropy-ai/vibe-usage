@@ -3,13 +3,13 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-/// Pricing per 1M tokens (USD).
+/// Per-token pricing (USD), aligned with LiteLLM field names.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ModelPrice {
-    pub input: f64,
-    pub output: f64,
-    pub cached_input: f64,
-    pub cache_write: f64,
+    pub input_cost_per_token: f64,
+    pub output_cost_per_token: f64,
+    pub cache_read_input_token_cost: f64,
+    pub cache_creation_input_token_cost: f64,
 }
 
 /// A subscription-based tool (flat monthly rate, no per-token cost).
@@ -80,118 +80,118 @@ impl PricingConfig {
             ConfigModelPrice {
                 match_pattern: "gpt-5.4".to_string(),
                 price: ModelPrice {
-                    input: 2.50,
-                    output: 15.00,
-                    cached_input: 0.25,
-                    cache_write: 2.50,
+                    input_cost_per_token: 2.50e-6,
+                    output_cost_per_token: 15.00e-6,
+                    cache_read_input_token_cost: 0.25e-6,
+                    cache_creation_input_token_cost: 2.50e-6,
                 },
             },
             ConfigModelPrice {
                 match_pattern: "gpt-5.3-codex".to_string(),
                 price: ModelPrice {
-                    input: 1.75,
-                    output: 14.00,
-                    cached_input: 0.175,
-                    cache_write: 1.75,
+                    input_cost_per_token: 1.75e-6,
+                    output_cost_per_token: 14.00e-6,
+                    cache_read_input_token_cost: 0.175e-6,
+                    cache_creation_input_token_cost: 1.75e-6,
                 },
             },
             ConfigModelPrice {
                 match_pattern: "gpt-5.1-codex".to_string(),
                 price: ModelPrice {
-                    input: 1.25,
-                    output: 10.00,
-                    cached_input: 0.125,
-                    cache_write: 1.25,
+                    input_cost_per_token: 1.25e-6,
+                    output_cost_per_token: 10.00e-6,
+                    cache_read_input_token_cost: 0.125e-6,
+                    cache_creation_input_token_cost: 1.25e-6,
                 },
             },
             ConfigModelPrice {
                 match_pattern: "gpt-5-codex".to_string(),
                 price: ModelPrice {
-                    input: 1.25,
-                    output: 10.00,
-                    cached_input: 0.125,
-                    cache_write: 1.25,
+                    input_cost_per_token: 1.25e-6,
+                    output_cost_per_token: 10.00e-6,
+                    cache_read_input_token_cost: 0.125e-6,
+                    cache_creation_input_token_cost: 1.25e-6,
                 },
             },
             ConfigModelPrice {
                 match_pattern: "gpt-5".to_string(),
                 price: ModelPrice {
-                    input: 1.25,
-                    output: 10.00,
-                    cached_input: 0.125,
-                    cache_write: 1.25,
+                    input_cost_per_token: 1.25e-6,
+                    output_cost_per_token: 10.00e-6,
+                    cache_read_input_token_cost: 0.125e-6,
+                    cache_creation_input_token_cost: 1.25e-6,
                 },
             },
             ConfigModelPrice {
                 match_pattern: "gemini-3.1-pro".to_string(),
                 price: ModelPrice {
-                    input: 2.00,
-                    output: 12.00,
-                    cached_input: 0.20,
-                    cache_write: 2.00,
+                    input_cost_per_token: 2.00e-6,
+                    output_cost_per_token: 12.00e-6,
+                    cache_read_input_token_cost: 0.20e-6,
+                    cache_creation_input_token_cost: 2.00e-6,
                 },
             },
             ConfigModelPrice {
                 match_pattern: "gemini-3-pro".to_string(),
                 price: ModelPrice {
-                    input: 2.00,
-                    output: 12.00,
-                    cached_input: 0.20,
-                    cache_write: 2.00,
+                    input_cost_per_token: 2.00e-6,
+                    output_cost_per_token: 12.00e-6,
+                    cache_read_input_token_cost: 0.20e-6,
+                    cache_creation_input_token_cost: 2.00e-6,
                 },
             },
             ConfigModelPrice {
                 match_pattern: "gemini-3-flash".to_string(),
                 price: ModelPrice {
-                    input: 0.50,
-                    output: 3.00,
-                    cached_input: 0.05,
-                    cache_write: 0.50,
+                    input_cost_per_token: 0.50e-6,
+                    output_cost_per_token: 3.00e-6,
+                    cache_read_input_token_cost: 0.05e-6,
+                    cache_creation_input_token_cost: 0.50e-6,
                 },
             },
             ConfigModelPrice {
                 match_pattern: "gemini-2.5-pro".to_string(),
                 price: ModelPrice {
-                    input: 1.25,
-                    output: 10.00,
-                    cached_input: 0.125,
-                    cache_write: 1.25,
+                    input_cost_per_token: 1.25e-6,
+                    output_cost_per_token: 10.00e-6,
+                    cache_read_input_token_cost: 0.125e-6,
+                    cache_creation_input_token_cost: 1.25e-6,
                 },
             },
             ConfigModelPrice {
                 match_pattern: "gemini".to_string(),
                 price: ModelPrice {
-                    input: 1.25,
-                    output: 10.00,
-                    cached_input: 0.125,
-                    cache_write: 1.25,
+                    input_cost_per_token: 1.25e-6,
+                    output_cost_per_token: 10.00e-6,
+                    cache_read_input_token_cost: 0.125e-6,
+                    cache_creation_input_token_cost: 1.25e-6,
                 },
             },
             ConfigModelPrice {
                 match_pattern: "opus".to_string(),
                 price: ModelPrice {
-                    input: 5.00,
-                    output: 25.00,
-                    cached_input: 0.50,
-                    cache_write: 10.00,
+                    input_cost_per_token: 5.00e-6,
+                    output_cost_per_token: 25.00e-6,
+                    cache_read_input_token_cost: 0.50e-6,
+                    cache_creation_input_token_cost: 10.00e-6,
                 },
             },
             ConfigModelPrice {
                 match_pattern: "sonnet".to_string(),
                 price: ModelPrice {
-                    input: 3.00,
-                    output: 15.00,
-                    cached_input: 0.30,
-                    cache_write: 6.00,
+                    input_cost_per_token: 3.00e-6,
+                    output_cost_per_token: 15.00e-6,
+                    cache_read_input_token_cost: 0.30e-6,
+                    cache_creation_input_token_cost: 6.00e-6,
                 },
             },
             ConfigModelPrice {
                 match_pattern: "haiku".to_string(),
                 price: ModelPrice {
-                    input: 1.00,
-                    output: 5.00,
-                    cached_input: 0.10,
-                    cache_write: 2.00,
+                    input_cost_per_token: 1.00e-6,
+                    output_cost_per_token: 5.00e-6,
+                    cache_read_input_token_cost: 0.10e-6,
+                    cache_creation_input_token_cost: 2.00e-6,
                 },
             },
         ]
@@ -254,9 +254,8 @@ pub fn calculate_cost(
     cache_read: u64,
     cache_write: u64,
 ) -> f64 {
-    let m = 1_000_000.0;
-    (input as f64 / m) * price.input
-        + ((output + thinking) as f64 / m) * price.output
-        + (cache_read as f64 / m) * price.cached_input
-        + (cache_write as f64 / m) * price.cache_write
+    input as f64 * price.input_cost_per_token
+        + (output + thinking) as f64 * price.output_cost_per_token
+        + cache_read as f64 * price.cache_read_input_token_cost
+        + cache_write as f64 * price.cache_creation_input_token_cost
 }

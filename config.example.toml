@@ -26,7 +26,8 @@ plan = "Pro"
 monthly_usd = 30.0
 
 # ── Custom model pricing ───────────────────────────────────────────
-# Add or override model pricing (per 1M tokens, USD).
+# Add or override model pricing (per token, USD).
+# Field names align with LiteLLM's pricing format.
 # Models are matched by checking if the model name contains match_pattern.
 # Custom entries are appended after built-in defaults.
 #
@@ -37,15 +38,15 @@ monthly_usd = 30.0
 # [[models]]
 # match_pattern = "deepseek-r1"
 # [models.price]
-# input = 0.55
-# output = 2.19
-# cached_input = 0.14
-# cache_write = 0.55
+# input_cost_per_token = 0.55e-6
+# output_cost_per_token = 2.19e-6
+# cache_read_input_token_cost = 0.14e-6
+# cache_creation_input_token_cost = 0.55e-6
 #
 # [[models]]
 # match_pattern = "grok-3"
 # [models.price]
-# input = 3.00
-# output = 15.00
-# cached_input = 0.30
-# cache_write = 3.00
+# input_cost_per_token = 3.00e-6
+# output_cost_per_token = 15.00e-6
+# cache_read_input_token_cost = 0.30e-6
+# cache_creation_input_token_cost = 3.00e-6
