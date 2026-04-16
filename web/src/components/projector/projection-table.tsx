@@ -58,6 +58,7 @@ export function ProjectionTable({ data, mode, providerFilter, sort, onSortChange
   const indicator = (key: SortKey) => (sort.key === key ? (sort.asc ? " ↑" : " ↓") : "");
 
   const label = MODE_LABELS[mode];
+  const showProvider = providerFilter === "all";
 
   return (
     <Card>
@@ -71,7 +72,7 @@ export function ProjectionTable({ data, mode, providerFilter, sort, onSortChange
             <thead>
               <tr className="border-b text-left text-xs text-slate-500">
                 <th className="pb-2 pr-4 font-medium cursor-pointer" onClick={() => toggleSort("model")}>Model{indicator("model")}</th>
-                <th className="pb-2 pr-4 font-medium cursor-pointer" onClick={() => toggleSort("provider")}>Provider{indicator("provider")}</th>
+                {showProvider && <th className="pb-2 pr-4 font-medium cursor-pointer" onClick={() => toggleSort("provider")}>Provider{indicator("provider")}</th>}
                 <th className="pb-2 pr-4 font-medium text-right cursor-pointer" onClick={() => toggleSort("cost")}>Cost{indicator("cost")}</th>
                 <th className="pb-2 font-medium text-right cursor-pointer" onClick={() => toggleSort("diff")}>vs Actual{indicator("diff")}</th>
               </tr>
@@ -96,7 +97,7 @@ export function ProjectionTable({ data, mode, providerFilter, sort, onSortChange
                         </span>
                       )}
                     </td>
-                    <td className="py-2 pr-4 text-slate-500">{row.provider}</td>
+                    {showProvider && <td className="py-2 pr-4 text-slate-500">{row.provider}</td>}
                     <td className="py-2 pr-4 text-right tabular-nums">{fmtUsd(cost)}</td>
                     <td className={`py-2 text-right tabular-nums font-medium ${diff > 0 ? "text-red-600" : diff < 0 ? "text-green-600" : "text-slate-500"}`}>
                       {diff > 0 ? "+" : ""}
