@@ -1,7 +1,18 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+
+/// A model entry exposed to the projector endpoint.
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectorModel {
+    pub name: String,
+    pub provider: String,
+    pub input_cost_per_token: f64,
+    pub output_cost_per_token: f64,
+    pub cache_read_input_token_cost: f64,
+    pub cache_creation_input_token_cost: f64,
+}
 
 /// Per-token pricing (USD), aligned with LiteLLM field names.
 #[derive(Debug, Clone, Deserialize)]
@@ -28,6 +39,7 @@ pub struct ConfigModelPrice {
 
 pub trait PricingProvider: Send + Sync {
     fn price_for(&self, model: &str) -> Option<ModelPrice>;
+    fn all_models(&self) -> Vec<ProjectorModel>;
     fn is_subscription(&self, tool: &str) -> bool;
     fn subscription_for(&self, tool: &str) -> Option<&Subscription>;
     fn subscription_months(&self, tool: &str, first_date: &str, last_date: &str) -> f64;
@@ -39,6 +51,7 @@ pub struct PricingConfig {
     /// tool name -> Subscription
     pub subscriptions: HashMap<String, Subscription>,
     pub models: Vec<ConfigModelPrice>,
+    pub litellm_models: Vec<crate::litellm::LitellmModel>,
 }
 
 impl PricingConfig {
@@ -69,9 +82,12 @@ impl PricingConfig {
         let mut models = Self::default_models();
         models.extend(custom_models);
 
+        let litellm_models = crate::litellm::load_litellm_models();
+
         PricingConfig {
             subscriptions: subs,
             models,
+            litellm_models,
         }
     }
 
@@ -223,13 +239,53 @@ impl PricingProvider for PricingConfig {
 
     fn price_for(&self, model: &str) -> Option<ModelPrice> {
         let m = model.to_lowercase();
+        // 1. Check user config + built-in patterns
         for config_model in &self.models {
             if m.contains(&config_model.match_pattern) || m.starts_with(&config_model.match_pattern)
             {
                 return Some(config_model.price.clone());
             }
         }
+        // 2. Fall back to LiteLLM data
+        for lm in &self.litellm_models {
+            if m.contains(&lm.name) || lm.name.contains(&m) {
+                return Some(ModelPrice {
+                    input_cost_per_token: lm.input_cost_per_token,
+                    output_cost_per_token: lm.output_cost_per_token,
+                    cache_read_input_token_cost: lm.cache_read_input_token_cost,
+                    cache_creation_input_token_cost: lm.cache_creation_input_token_cost,
+                });
+            }
+        }
         None
+    }
+
+    fn all_models(&self) -> Vec<ProjectorModel> {
+        let mut result: Vec<ProjectorModel> = self
+            .litellm_models
+            .iter()
+            .map(|lm| ProjectorModel {
+                name: lm.name.clone(),
+                provider: lm.provider.clone(),
+                input_cost_per_token: lm.input_cost_per_token,
+                output_cost_per_token: lm.output_cost_per_token,
+                cache_read_input_token_cost: lm.cache_read_input_token_cost,
+                cache_creation_input_token_cost: lm.cache_creation_input_token_cost,
+            })
+            .collect();
+
+        // Apply config overrides
+        for cm in &self.models {
+            if let Some(existing) = result.iter_mut().find(|m| m.name.contains(&cm.match_pattern)) {
+                existing.input_cost_per_token = cm.price.input_cost_per_token;
+                existing.output_cost_per_token = cm.price.output_cost_per_token;
+                existing.cache_read_input_token_cost = cm.price.cache_read_input_token_cost;
+                existing.cache_creation_input_token_cost =
+                    cm.price.cache_creation_input_token_cost;
+            }
+        }
+
+        result
     }
 }
 

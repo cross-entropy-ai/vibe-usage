@@ -261,6 +261,10 @@ mod tests {
             }
         }
 
+        fn all_models(&self) -> Vec<crate::pricing::ProjectorModel> {
+            vec![]
+        }
+
         fn is_subscription(&self, _tool: &str) -> bool {
             false
         }
