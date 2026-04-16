@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useProjectorData } from "@/hooks/use-projector-data";
 import { useSearchParamState } from "@/hooks/use-search-param-state";
 import { projectUsage } from "@/lib/projector-calc";
-import { ProjectionTable } from "@/components/projector/projection-table";
+import { ProjectionTable, type SortState } from "@/components/projector/projection-table";
 import { ProjectionChart } from "@/components/projector/projection-chart";
 import { Button } from "@/components/ui/button";
 import { ManualCalculator } from "@/components/projector/manual-calculator";
@@ -37,6 +37,7 @@ export default function ProjectorPage() {
   const { models, usage, loading, errors, initialLoad } = useProjectorData(dateRange);
 
   const [providerFilter, setProviderFilter] = useState("all");
+  const [tableSort, setTableSort] = useState<SortState>({ key: "cost", asc: true });
 
   const projection = useMemo(() => {
     if (!models || !usage) return null;
@@ -149,6 +150,8 @@ export default function ProjectorPage() {
                 data={projection}
                 mode="with_cache"
                 providerFilter={providerFilter}
+                sort={tableSort}
+                onSortChange={setTableSort}
                 currentModels={currentModels}
                 currentCost={currentCost}
               />
@@ -156,6 +159,8 @@ export default function ProjectorPage() {
                 data={projection}
                 mode="without_cache"
                 providerFilter={providerFilter}
+                sort={tableSort}
+                onSortChange={setTableSort}
                 currentModels={currentModels}
                 currentCost={currentCost}
               />

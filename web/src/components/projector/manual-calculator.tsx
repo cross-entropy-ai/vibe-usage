@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { projectUsage, manualTokens } from "@/lib/projector-calc";
-import { ProjectionTable } from "./projection-table";
+import { ProjectionTable, type SortState } from "./projection-table";
 import { ProjectionChart } from "./projection-chart";
 import type { ProjectorModel } from "@/types/projector";
 
@@ -36,6 +36,7 @@ interface Props {
 }
 
 export function ManualCalculator({ models, providerFilter }: Props) {
+  const [calcSort, setCalcSort] = useState<SortState>({ key: "cost", asc: true });
   const [input, setInput] = useState(0);
   const [output, setOutput] = useState(0);
   const [thinking, setThinking] = useState(0);
@@ -95,8 +96,8 @@ export function ManualCalculator({ models, providerFilter }: Props) {
       {projection && (
         <>
           <div className="grid gap-4 lg:grid-cols-2">
-            <ProjectionTable data={projection} mode="with_cache" providerFilter={providerFilter} currentModels={[]} currentCost={0} />
-            <ProjectionTable data={projection} mode="without_cache" providerFilter={providerFilter} currentModels={[]} currentCost={0} />
+            <ProjectionTable data={projection} mode="with_cache" providerFilter={providerFilter} sort={calcSort} onSortChange={setCalcSort} currentModels={[]} currentCost={0} />
+            <ProjectionTable data={projection} mode="without_cache" providerFilter={providerFilter} sort={calcSort} onSortChange={setCalcSort} currentModels={[]} currentCost={0} />
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
             <ProjectionChart data={projection} mode="with_cache" providerFilter={providerFilter} />

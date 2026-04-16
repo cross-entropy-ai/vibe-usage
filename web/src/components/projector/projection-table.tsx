@@ -1,14 +1,18 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { fmtUsd } from "@/lib/formatters";
 import type { ProjectionResult } from "@/lib/projector-calc";
 
 export type CostMode = "with_cache" | "without_cache";
+export type SortKey = "model" | "provider" | "cost" | "diff";
+export interface SortState { key: SortKey; asc: boolean }
 
 interface Props {
   data: ProjectionResult[];
   mode: CostMode;
   providerFilter: string;
+  sort: SortState;
+  onSortChange: (sort: SortState) => void;
   currentModels: string[];
   currentCost: number;
 }
@@ -18,11 +22,7 @@ const MODE_LABELS: Record<CostMode, { title: string; description: string }> = {
   without_cache: { title: "Without Cache", description: "Projected cost treating all tokens as raw input/output" },
 };
 
-type SortKey = "model" | "provider" | "cost" | "diff";
-
-export function ProjectionTable({ data, mode, providerFilter, currentModels, currentCost }: Props) {
-  const [sortKey, setSortKey] = useState<SortKey>("cost");
-  const [sortAsc, setSortAsc] = useState(true);
+export function ProjectionTable({ data, mode, providerFilter, sort, onSortChange, currentModels, currentCost }: Props) {
 
   const costOf = (row: ProjectionResult) =>
     mode === "with_cache" ? row.cost_with_cache : row.cost_without_cache;
@@ -34,16 +34,16 @@ export function ProjectionTable({ data, mode, providerFilter, currentModels, cur
     const list = [...data];
     list.sort((a, b) => {
       let cmp = 0;
-      switch (sortKey) {
+      switch (sort.key) {
         case "model": cmp = a.model.localeCompare(b.model); break;
         case "provider": cmp = a.provider.localeCompare(b.provider); break;
         case "cost": cmp = costOf(a) - costOf(b); break;
         case "diff": cmp = diffOf(a) - diffOf(b); break;
       }
-      return sortAsc ? cmp : -cmp;
+      return sort.asc ? cmp : -cmp;
     });
     return list;
-  }, [data, mode, sortKey, sortAsc, currentCost]);
+  }, [data, mode, sort, currentCost]);
 
   const filtered = useMemo(() => {
     if (providerFilter === "all") return sorted;
@@ -51,11 +51,11 @@ export function ProjectionTable({ data, mode, providerFilter, currentModels, cur
   }, [sorted, providerFilter]);
 
   function toggleSort(key: SortKey) {
-    if (sortKey === key) setSortAsc(!sortAsc);
-    else { setSortKey(key); setSortAsc(true); }
+    if (sort.key === key) onSortChange({ key, asc: !sort.asc });
+    else onSortChange({ key, asc: true });
   }
 
-  const indicator = (key: SortKey) => (sortKey === key ? (sortAsc ? " ↑" : " ↓") : "");
+  const indicator = (key: SortKey) => (sort.key === key ? (sort.asc ? " ↑" : " ↓") : "");
 
   const label = MODE_LABELS[mode];
 
