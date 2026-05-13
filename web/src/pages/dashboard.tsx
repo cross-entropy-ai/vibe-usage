@@ -109,26 +109,62 @@ function Dashboard() {
 
   const filteredSummary = useMemo(() => {
     if (!data?.summary) return null;
+    if (toolLens === "all") {
+      return {
+        ...data.summary,
+        by_tool: filterToolCounts(data.summary.by_tool, toolLens),
+      };
+    }
+    const projectedDaily = data.summary.daily
+      .map((entry) => {
+        const t = entry.by_tool?.[toolLens];
+        return {
+          date: entry.date,
+          sessions: t?.sessions ?? 0,
+          messages: t?.messages ?? 0,
+          user_messages: t?.user_messages ?? 0,
+          input_tokens: t?.input_tokens ?? 0,
+          output_tokens: t?.output_tokens ?? 0,
+          by_tool: t ? { [toolLens]: t } : {},
+        };
+      })
+      .filter(
+        (e) =>
+          e.sessions > 0 ||
+          e.messages > 0 ||
+          e.input_tokens > 0 ||
+          e.output_tokens > 0,
+      );
     return {
       ...data.summary,
       by_tool: filterToolCounts(data.summary.by_tool, toolLens),
+      daily: projectedDaily,
     };
   }, [data, toolLens]);
 
   const filteredCost = useMemo(() => {
     if (!data?.cost) return null;
+    if (toolLens === "all") return data.cost;
+    const projectedDaily = data.cost.daily
+      .map((entry) => ({
+        date: entry.date,
+        equivalent_api_cost_usd: entry.by_tool?.[toolLens] ?? 0,
+        by_tool: entry.by_tool?.[toolLens] !== undefined
+          ? { [toolLens]: entry.by_tool[toolLens] }
+          : {},
+      }))
+      .filter((e) => e.equivalent_api_cost_usd > 0);
     return {
       ...data.cost,
-      by_tool:
-        toolLens === "all"
-          ? data.cost.by_tool
-          : Object.fromEntries(
-              Object.entries(data.cost.by_tool).filter(([tool]) => tool === toolLens),
-            ),
-      by_model:
-        toolLens === "all"
-          ? data.cost.by_model
-          : data.cost.by_model.filter((entry) => entry.tool === toolLens),
+      equivalent_api_cost_usd: projectedDaily.reduce(
+        (s, e) => s + e.equivalent_api_cost_usd,
+        0,
+      ),
+      by_tool: Object.fromEntries(
+        Object.entries(data.cost.by_tool).filter(([tool]) => tool === toolLens),
+      ),
+      by_model: data.cost.by_model.filter((entry) => entry.tool === toolLens),
+      daily: projectedDaily,
     };
   }, [data, toolLens]);
 

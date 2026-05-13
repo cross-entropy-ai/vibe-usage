@@ -52,6 +52,7 @@ pub struct SubscriptionInfo {
 pub struct DailyCost {
     pub date: String,
     pub equivalent_api_cost_usd: f64,
+    pub by_tool: HashMap<String, f64>,
 }
 
 // ── Public functions ───────────────────────────────────────────────
@@ -192,10 +193,11 @@ pub fn cost_breakdown(sessions: &[Session], pricing: &dyn PricingProvider) -> Co
         })
         .collect();
 
-    // Daily cost (at API rate)
-    let mut daily_map: BTreeMap<String, f64> = BTreeMap::new();
+    // Daily cost (at API rate), broken down per tool
+    let mut daily_map: BTreeMap<String, (f64, HashMap<String, f64>)> = BTreeMap::new();
     for s in sessions {
         let day = local_date(&s.start_time);
+        let tool = s.tool.to_string();
         for m in &s.messages {
             let model = m
                 .model
@@ -216,15 +218,21 @@ pub fn cost_breakdown(sessions: &[Session], pricing: &dyn PricingProvider) -> Co
                         )
                     })
                     .unwrap_or(0.0);
-                *daily_map.entry(day.clone()).or_default() += cost;
+                let entry = daily_map.entry(day.clone()).or_default();
+                entry.0 += cost;
+                *entry.1.entry(tool.clone()).or_default() += cost;
             }
         }
     }
     let daily: Vec<DailyCost> = daily_map
         .into_iter()
-        .map(|(date, cost)| DailyCost {
+        .map(|(date, (cost, by_tool))| DailyCost {
             date,
             equivalent_api_cost_usd: round2(cost),
+            by_tool: by_tool
+                .into_iter()
+                .map(|(tool, c)| (tool, round2(c)))
+                .collect(),
         })
         .collect();
 

@@ -45,6 +45,14 @@ export interface Session {
   messages: Message[];
 }
 
+export interface DailyByTool {
+  sessions: number;
+  messages: number;
+  user_messages: number;
+  input_tokens: number;
+  output_tokens: number;
+}
+
 export interface DailyStat {
   date: string;
   sessions: number;
@@ -52,6 +60,7 @@ export interface DailyStat {
   user_messages: number;
   input_tokens: number;
   output_tokens: number;
+  by_tool?: Record<string, DailyByTool>;
 }
 
 export interface Summary {
@@ -207,6 +216,7 @@ export interface CostToolEntry {
 export interface CostDailyEntry {
   date: string;
   equivalent_api_cost_usd: number;
+  by_tool?: Record<string, number>;
 }
 
 export interface CostData {

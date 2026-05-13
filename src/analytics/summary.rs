@@ -33,6 +33,15 @@ pub struct PeriodRange {
     pub end: Option<String>,
 }
 
+#[derive(Debug, Serialize, Default, Clone)]
+pub struct DailyByTool {
+    pub sessions: u64,
+    pub messages: u64,
+    pub user_messages: u64,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+}
+
 #[derive(Debug, Serialize)]
 pub struct DailyStats {
     pub date: String,
@@ -41,6 +50,7 @@ pub struct DailyStats {
     pub user_messages: u64,
     pub input_tokens: u64,
     pub output_tokens: u64,
+    pub by_tool: HashMap<String, DailyByTool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -74,21 +84,13 @@ pub fn summary(sessions: &[Session]) -> SummaryStats {
 
     let tokens = sum_tokens(sessions);
 
-    // Daily stats
+    // Daily stats (also broken down per tool)
     let mut daily_map: BTreeMap<String, DailyStats> = BTreeMap::new();
     for s in sessions {
         let day = local_date(&s.start_time);
-        let entry = daily_map.entry(day.clone()).or_insert_with(|| DailyStats {
-            date: day,
-            sessions: 0,
-            messages: 0,
-            user_messages: 0,
-            input_tokens: 0,
-            output_tokens: 0,
-        });
-        entry.sessions += 1;
-        entry.messages += s.messages.len() as u64;
-        entry.user_messages += s.messages.iter().filter(|m| m.role == Role::User).count() as u64;
+        let tool = s.tool.to_string();
+        let msg_count = s.messages.len() as u64;
+        let user_msg_count = s.messages.iter().filter(|m| m.role == Role::User).count() as u64;
         let inp: u64 = s
             .messages
             .iter()
@@ -101,8 +103,28 @@ pub fn summary(sessions: &[Session]) -> SummaryStats {
             .filter_map(|m| m.tokens.as_ref())
             .filter_map(|t| t.output)
             .sum();
+
+        let entry = daily_map.entry(day.clone()).or_insert_with(|| DailyStats {
+            date: day,
+            sessions: 0,
+            messages: 0,
+            user_messages: 0,
+            input_tokens: 0,
+            output_tokens: 0,
+            by_tool: HashMap::new(),
+        });
+        entry.sessions += 1;
+        entry.messages += msg_count;
+        entry.user_messages += user_msg_count;
         entry.input_tokens += inp;
         entry.output_tokens += out;
+
+        let tool_entry = entry.by_tool.entry(tool).or_default();
+        tool_entry.sessions += 1;
+        tool_entry.messages += msg_count;
+        tool_entry.user_messages += user_msg_count;
+        tool_entry.input_tokens += inp;
+        tool_entry.output_tokens += out;
     }
     let daily: Vec<DailyStats> = daily_map.into_values().collect();
 
