@@ -274,3 +274,50 @@ fn build_list_populates_summary_fields() {
     assert_eq!(item.token_total, 150);
     assert_eq!(item.tool, "claude");
 }
+
+struct StubPricing {
+    input: f64,
+    output: f64,
+}
+
+impl sessions_view::PricingLookup for StubPricing {
+    fn input_output(&self, _model: &str) -> Option<(f64, f64)> {
+        Some((self.input, self.output))
+    }
+}
+
+#[test]
+fn estimated_cost_sums_per_model_rates() {
+    let mut s = session_with_messages(vec![
+        Message {
+            role: Role::Assistant,
+            content: String::new(),
+            timestamp: ts(),
+            model: Some("claude-opus".to_string()),
+            tokens: Some(TokenUsage {
+                input: Some(1_000),
+                output: Some(500),
+                thinking: None,
+                cache_read: None,
+                cache_write: None,
+            }),
+            duration_ms: None,
+            tool_calls: vec![],
+        },
+    ]);
+    s.tool = Tool::Claude;
+    let pricing = StubPricing { input: 0.000_003, output: 0.000_015 };
+    let cost = sessions_view::estimated_cost_usd(&s, &pricing);
+    // 1000 * 3e-6 + 500 * 15e-6 = 0.003 + 0.0075 = 0.0105
+    assert!((cost - 0.0105).abs() < 1e-9, "got {cost}");
+}
+
+#[test]
+fn estimated_cost_zero_when_pricing_missing() {
+    struct NoPricing;
+    impl sessions_view::PricingLookup for NoPricing {
+        fn input_output(&self, _model: &str) -> Option<(f64, f64)> { None }
+    }
+    let s = session_with_messages(vec![msg_with_tokens(Role::Assistant, 100, 50, None)]);
+    assert_eq!(sessions_view::estimated_cost_usd(&s, &NoPricing), 0.0);
+}

@@ -251,3 +251,29 @@ fn build_preview(content: &str, byte_idx: usize, match_len: usize) -> String {
         snippet
     }
 }
+
+/// Trait used so that pure analytics code stays independent of the concrete
+/// `PricingProvider` type. The HTTP layer adapts the real provider into this.
+pub trait PricingLookup {
+    fn input_output(&self, model: &str) -> Option<(f64, f64)>;
+}
+
+pub fn estimated_cost_usd(session: &Session, pricing: &dyn PricingLookup) -> f64 {
+    let mut total = 0.0;
+    for m in &session.messages {
+        let model = match m.model.as_deref().or(session.model.as_deref()) {
+            Some(m) => m,
+            None => continue,
+        };
+        let Some((in_rate, out_rate)) = pricing.input_output(model) else {
+            continue;
+        };
+        let tokens = match &m.tokens {
+            Some(t) => t,
+            None => continue,
+        };
+        total += (tokens.input.unwrap_or(0) as f64) * in_rate;
+        total += (tokens.output.unwrap_or(0) as f64) * out_rate;
+    }
+    total
+}
