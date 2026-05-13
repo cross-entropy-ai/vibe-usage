@@ -1,5 +1,5 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChartContainer,
   ChartTooltip,
@@ -7,6 +7,8 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { fmtUsd } from "@/lib/formatters";
+import { useChartScale } from "@/lib/contexts";
+import { ChartScaleToggle } from "./chart-scale-toggle";
 import type { CostModelEntry } from "@/types";
 
 const config = {
@@ -14,7 +16,8 @@ const config = {
 } satisfies ChartConfig;
 
 export function CostByModelChart({ data, limit = 10 }: { data: CostModelEntry[]; limit?: number }) {
-  // Aggregate per-date entries into per-model totals
+  const { scale, isLog, toggle } = useChartScale();
+
   const modelMap = new Map<string, number>();
   for (const entry of data) {
     const key = entry.model.replace(/-\d{8}$/, "").slice(0, 24);
@@ -25,13 +28,17 @@ export function CostByModelChart({ data, limit = 10 }: { data: CostModelEntry[];
     equivalent_api_cost_usd,
   }))
     .sort((a, b) => b.equivalent_api_cost_usd - a.equivalent_api_cost_usd)
-    .slice(0, limit);
+    .slice(0, limit)
+    .filter((m) => !isLog || m.equivalent_api_cost_usd > 0);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Cost by Model</CardTitle>
         <CardDescription>Top models by equivalent API cost</CardDescription>
+        <CardAction>
+          <ChartScaleToggle scale={scale} onToggle={toggle} />
+        </CardAction>
       </CardHeader>
       <CardContent>
         <ChartContainer config={config} className="h-[250px] w-full">
@@ -47,6 +54,9 @@ export function CostByModelChart({ data, limit = 10 }: { data: CostModelEntry[];
             />
             <XAxis
               type="number"
+              scale={scale}
+              domain={isLog ? [0.01, "auto"] : [0, "auto"]}
+              allowDataOverflow={isLog}
               tickFormatter={(v: number) => fmtUsd(v)}
               tickLine={false}
               axisLine={false}

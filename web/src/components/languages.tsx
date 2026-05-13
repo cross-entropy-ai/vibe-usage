@@ -1,5 +1,6 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell, LabelList } from "recharts";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChartScaleToggle } from "./chart-scale-toggle";
 import {
   ChartContainer,
   ChartTooltip,
@@ -7,6 +8,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { CHART_PALETTE } from "@/lib/tools";
+import { useChartScale } from "@/lib/contexts";
 import type { LanguagesData } from "@/types";
 
 const TASK_COLORS: Record<string, string> = {
@@ -28,6 +30,7 @@ const taskConfig = { sessions: { label: "Sessions", color: "#888" } } satisfies 
 
 export function Languages({ data, taskLimit = 10 }: { data: LanguagesData; taskLimit?: number }) {
   const tasks = data.task_types.slice(0, taskLimit);
+  const { scale, domain, toggle } = useChartScale();
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
@@ -60,13 +63,16 @@ export function Languages({ data, taskLimit = 10 }: { data: LanguagesData; taskL
         <CardHeader>
           <CardTitle className="text-base">Task Types</CardTitle>
           <CardDescription>Classified from first user message</CardDescription>
+          <CardAction>
+            <ChartScaleToggle scale={scale} onToggle={toggle} />
+          </CardAction>
         </CardHeader>
         <CardContent>
           <ChartContainer config={taskConfig} className="h-[250px] w-full">
             <BarChart data={tasks} layout="vertical" accessibilityLayer margin={{ left: 0 }}>
               <CartesianGrid horizontal={false} />
               <YAxis type="category" dataKey="task" hide />
-              <XAxis type="number" scale="log" domain={[1, "auto"]} tickLine={false} axisLine={false} />
+              <XAxis type="number" scale={scale} domain={domain} tickLine={false} axisLine={false} />
               <ChartTooltip content={<ChartTooltipContent />} />
               <Bar dataKey="sessions" radius={[0, 4, 4, 0]} barSize={22}>
                 <LabelList

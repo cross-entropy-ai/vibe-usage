@@ -1,5 +1,6 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChartScaleToggle } from "./chart-scale-toggle";
 import {
   ChartContainer,
   ChartTooltip,
@@ -7,6 +8,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { fmtDate, fmtNum } from "@/lib/formatters";
+import { useChartScale } from "@/lib/contexts";
 import type { DailyStat } from "@/types";
 
 const barConfig = {
@@ -15,11 +17,18 @@ const barConfig = {
 } satisfies ChartConfig;
 
 export function TokenBarChart({ daily }: { daily: DailyStat[] }) {
+  const { scale, domain, isLog, toggle } = useChartScale();
+  const inputDaily = isLog ? daily.filter((d) => d.input_tokens > 0) : daily;
+  const outputDaily = isLog ? daily.filter((d) => d.output_tokens > 0) : daily;
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Token Usage</CardTitle>
-        <CardDescription>Split scales keep input and output readable</CardDescription>
+        <CardDescription>{isLog ? "Daily input and output tokens on a log scale" : "Daily input and output tokens"}</CardDescription>
+        <CardAction>
+          <ChartScaleToggle scale={scale} onToggle={toggle} />
+        </CardAction>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
@@ -30,10 +39,17 @@ export function TokenBarChart({ daily }: { daily: DailyStat[] }) {
             <p className="text-xs text-muted-foreground">Independent scale</p>
           </div>
           <ChartContainer config={barConfig} className="h-[140px] w-full">
-            <BarChart data={daily} accessibilityLayer>
+            <BarChart data={inputDaily} accessibilityLayer>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="date" hide />
-              <YAxis tickFormatter={fmtNum} tickLine={false} axisLine={false} tickMargin={8} />
+              <YAxis
+                scale={scale}
+                domain={domain}
+                tickFormatter={fmtNum}
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+              />
               <ChartTooltip content={<ChartTooltipContent />} />
               <Bar dataKey="input_tokens" fill="var(--color-input_tokens)" radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -48,10 +64,17 @@ export function TokenBarChart({ daily }: { daily: DailyStat[] }) {
             <p className="text-xs text-muted-foreground">Independent scale</p>
           </div>
           <ChartContainer config={barConfig} className="h-[140px] w-full">
-            <BarChart data={daily} accessibilityLayer>
+            <BarChart data={outputDaily} accessibilityLayer>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="date" tickFormatter={fmtDate} tickLine={false} axisLine={false} tickMargin={8} />
-              <YAxis tickFormatter={fmtNum} tickLine={false} axisLine={false} tickMargin={8} />
+              <YAxis
+                scale={scale}
+                domain={domain}
+                tickFormatter={fmtNum}
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+              />
               <ChartTooltip content={<ChartTooltipContent />} />
               <Bar dataKey="output_tokens" fill="var(--color-output_tokens)" radius={[4, 4, 0, 0]} />
             </BarChart>

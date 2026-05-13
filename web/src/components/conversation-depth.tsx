@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChartScaleToggle } from "./chart-scale-toggle";
 import {
   ChartContainer,
   ChartTooltip,
@@ -8,6 +9,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { fmtNum } from "@/lib/formatters";
+import { useChartScale } from "@/lib/contexts";
 import type { ConversationsInsight } from "@/types";
 
 const depthConfig = { count: { label: "Sessions", color: "var(--chart-1)" } } satisfies ChartConfig;
@@ -17,6 +19,8 @@ const lengthConfig = {
 } satisfies ChartConfig;
 
 export function ConversationDepth({ data }: { data: ConversationsInsight }) {
+  const depthScale = useChartScale();
+  const lengthScale = useChartScale();
   const lengthHistogram = useMemo(() => {
     const responseByBucket = new Map(
       data.response_length.histogram.map((entry) => [entry.bucket, entry.count]),
@@ -39,13 +43,19 @@ export function ConversationDepth({ data }: { data: ConversationsInsight }) {
           <CardDescription>
             avg {data.depth.avg.toFixed(1)} messages, median {data.depth.median} messages per session
           </CardDescription>
+          <CardAction>
+            <ChartScaleToggle scale={depthScale.scale} onToggle={depthScale.toggle} />
+          </CardAction>
         </CardHeader>
         <CardContent>
           <ChartContainer config={depthConfig} className="h-[200px] w-full">
-            <BarChart data={data.depth.histogram} accessibilityLayer>
+            <BarChart
+              data={depthScale.isLog ? data.depth.histogram.filter((d) => d.count > 0) : data.depth.histogram}
+              accessibilityLayer
+            >
               <CartesianGrid vertical={false} />
               <XAxis dataKey="bucket" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-              <YAxis tickLine={false} axisLine={false} />
+              <YAxis scale={depthScale.scale} domain={depthScale.domain} tickLine={false} axisLine={false} />
               <ChartTooltip content={<ChartTooltipContent />} />
               <Bar dataKey="count" fill="var(--color-count)" radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -60,13 +70,16 @@ export function ConversationDepth({ data }: { data: ConversationsInsight }) {
             {" · "}
             Response avg {fmtNum(data.response_length.avg_chars)} / median {fmtNum(data.response_length.median_chars)}
           </CardDescription>
+          <CardAction>
+            <ChartScaleToggle scale={lengthScale.scale} onToggle={lengthScale.toggle} />
+          </CardAction>
         </CardHeader>
         <CardContent>
           <ChartContainer config={lengthConfig} className="h-[200px] w-full">
             <BarChart data={lengthHistogram} accessibilityLayer>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="bucket" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-              <YAxis scale="log" domain={[1, "auto"]} tickFormatter={fmtNum} tickLine={false} axisLine={false} />
+              <YAxis scale={lengthScale.scale} domain={lengthScale.domain} tickFormatter={fmtNum} tickLine={false} axisLine={false} />
               <ChartTooltip content={<ChartTooltipContent />} />
               <Legend />
               <Bar dataKey="prompt" fill="var(--color-prompt)" radius={[4, 4, 0, 0]} />

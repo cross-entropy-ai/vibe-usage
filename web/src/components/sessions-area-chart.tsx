@@ -1,5 +1,6 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChartScaleToggle } from "./chart-scale-toggle";
 import {
   ChartContainer,
   ChartTooltip,
@@ -7,6 +8,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { fmtDate, fmtNum } from "@/lib/formatters";
+import { useChartScale } from "@/lib/contexts";
 import type { DailyStat } from "@/types";
 
 const barConfig = {
@@ -15,13 +17,18 @@ const barConfig = {
 } satisfies ChartConfig;
 
 export function SessionsAreaChart({ daily }: { daily: DailyStat[] }) {
-  const safeDaily = daily.filter((d) => d.sessions > 0 && d.messages > 0);
+  const { scale, domain, isLog, toggle } = useChartScale();
+  const messagesData = isLog ? daily.filter((d) => d.messages > 0) : daily;
+  const sessionsData = isLog ? daily.filter((d) => d.sessions > 0) : daily;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Sessions & Messages</CardTitle>
-        <CardDescription>Split scales keep both daily counts readable</CardDescription>
+        <CardDescription>{isLog ? "Split scales keep both daily counts readable" : "Daily session and message counts"}</CardDescription>
+        <CardAction>
+          <ChartScaleToggle scale={scale} onToggle={toggle} />
+        </CardAction>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
@@ -32,12 +39,12 @@ export function SessionsAreaChart({ daily }: { daily: DailyStat[] }) {
             <p className="text-xs text-muted-foreground">Independent scale</p>
           </div>
           <ChartContainer config={barConfig} className="h-[140px] w-full">
-            <BarChart data={safeDaily} accessibilityLayer>
+            <BarChart data={messagesData} accessibilityLayer>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="date" hide />
               <YAxis
-                scale="log"
-                domain={[1, "auto"]}
+                scale={scale}
+                domain={domain}
                 tickFormatter={fmtNum}
                 tickLine={false}
                 axisLine={false}
@@ -57,12 +64,12 @@ export function SessionsAreaChart({ daily }: { daily: DailyStat[] }) {
             <p className="text-xs text-muted-foreground">Independent scale</p>
           </div>
           <ChartContainer config={barConfig} className="h-[140px] w-full">
-            <BarChart data={safeDaily} accessibilityLayer>
+            <BarChart data={sessionsData} accessibilityLayer>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="date" tickFormatter={fmtDate} tickLine={false} axisLine={false} tickMargin={8} />
               <YAxis
-                scale="log"
-                domain={[1, "auto"]}
+                scale={scale}
+                domain={domain}
                 tickFormatter={fmtNum}
                 tickLine={false}
                 axisLine={false}

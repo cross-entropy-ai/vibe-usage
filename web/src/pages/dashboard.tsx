@@ -10,6 +10,7 @@ import {
   TokenProvider,
   ModelsToolsProvider,
   TablesProvider,
+  ScaleModeProvider,
   composeProviders,
 } from "@/lib/contexts";
 import { OverviewSection } from "@/sections/overview-section";
@@ -348,5 +349,9 @@ function Dashboard() {
 }
 
 export default function DashboardPage() {
-  return <Dashboard />;
+  return (
+    <ScaleModeProvider>
+      <Dashboard />
+    </ScaleModeProvider>
+  );
 }

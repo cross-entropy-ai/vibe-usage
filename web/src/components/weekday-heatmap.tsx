@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useChartScale } from "@/lib/contexts";
+import { ChartScaleToggle } from "./chart-scale-toggle";
 import type { WeekdayHeatmapEntry } from "@/types";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -14,9 +16,9 @@ const LEVELS = [
   "bg-chart-1/80",
 ];
 
-function getLevel(count: number, max: number): number {
+function getLevel(count: number, max: number, isLog: boolean): number {
   if (count === 0 || max === 0) return 0;
-  const r = Math.log(count) / Math.log(max);
+  const r = isLog ? Math.log(count) / Math.log(max) : count / max;
   if (r <= 0.25) return 1;
   if (r <= 0.5) return 2;
   if (r <= 0.75) return 3;
@@ -24,6 +26,7 @@ function getLevel(count: number, max: number): number {
 }
 
 export function WeekdayHeatmap({ data }: { data: WeekdayHeatmapEntry[] }) {
+  const { scale, isLog, toggle } = useChartScale();
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
 
   const { grid, max } = useMemo(() => {
@@ -42,6 +45,9 @@ export function WeekdayHeatmap({ data }: { data: WeekdayHeatmapEntry[] }) {
       <CardHeader>
         <CardTitle className="text-base">Activity Punchcard</CardTitle>
         <CardDescription>Session starts by hour and weekday</CardDescription>
+        <CardAction>
+          <ChartScaleToggle scale={scale} onToggle={toggle} />
+        </CardAction>
       </CardHeader>
       <CardContent className="overflow-x-auto">
         <div className="relative" style={{ minWidth: 24 * (CELL + GAP) + 50 }}>
@@ -61,7 +67,7 @@ export function WeekdayHeatmap({ data }: { data: WeekdayHeatmapEntry[] }) {
               <div className="flex" style={{ gap: GAP }}>
                 {Array.from({ length: 24 }, (_, h) => {
                   const count = grid[di][h];
-                  const level = getLevel(count, max);
+                  const level = getLevel(count, max, isLog);
                   const tooltipText = count > 0
                     ? `${count} session${count > 1 ? "s" : ""} — ${day} ${h}:00`
                     : `No activity — ${day} ${h}:00`;

@@ -21,6 +21,7 @@ import {
   fmtUsd,
 } from "@/lib/formatters";
 import { TOOL_NAMES, type Tool, toolLabel } from "@/lib/tools";
+import { useScaleMode } from "@/lib/contexts";
 import type {
   CostData,
   Summary,
@@ -58,6 +59,31 @@ function safeDivide(numerator: number, denominator: number): number | null {
 
 function fmtMillions(n: number): string {
   return `${(n / 1_000_000).toFixed(1)}M`;
+}
+
+function ScaleToggle() {
+  const { scaleMode, setScaleMode } = useScaleMode();
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+        Scale
+      </p>
+      <div className="flex gap-1.5">
+        {(["log", "linear"] as const).map((mode) => (
+          <Button
+            key={mode}
+            type="button"
+            size="xs"
+            variant={scaleMode === mode ? "default" : "outline"}
+            className={scaleMode === mode ? "bg-slate-950 text-white hover:bg-slate-900" : "bg-white"}
+            onClick={() => setScaleMode(mode)}
+          >
+            {mode === "log" ? "Log" : "Linear"}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function ToolbarGroup<T extends string>({
@@ -165,22 +191,25 @@ export function DashboardHeader({
       <CardHeader className="gap-5">
         <div className="flex flex-col gap-5">
           <div className="space-y-4">
-            <div className="space-y-2">
-              <CardTitle className="max-w-3xl text-3xl font-semibold tracking-tight text-slate-950">
-                Agent Usage Dashboard
-              </CardTitle>
-              <CardDescription className="max-w-2xl text-sm leading-6 text-slate-600">
-                Cost, throughput, runtime behavior, and workspace concentration
-                for coding agents across Claude, Gemini, Codex, and Kimi.
-              </CardDescription>
-              <div className="mt-3">
-                <Link
-                  to="/projector"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900"
-                >
-                  Cost Projector →
-                </Link>
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-2">
+                <CardTitle className="max-w-3xl text-3xl font-semibold tracking-tight text-slate-950">
+                  Agent Usage Dashboard
+                </CardTitle>
+                <CardDescription className="max-w-2xl text-sm leading-6 text-slate-600">
+                  Cost, throughput, runtime behavior, and workspace concentration
+                  for coding agents across Claude, Gemini, Codex, and Kimi.
+                </CardDescription>
+                <div className="mt-3">
+                  <Link
+                    to="/projector"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900"
+                  >
+                    Cost Projector →
+                  </Link>
+                </div>
               </div>
+              <ScaleToggle />
             </div>
           </div>
 

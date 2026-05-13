@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useChartScale } from "@/lib/contexts";
+import { ChartScaleToggle } from "./chart-scale-toggle";
 import type { DailyStat } from "@/types";
 
 const WEEKS = 53;
@@ -19,10 +21,9 @@ const LEVELS = [
   "bg-emerald-700 dark:bg-emerald-400",
 ];
 
-function getLevel(count: number, max: number): number {
+function getLevel(count: number, max: number, isLog: boolean): number {
   if (count === 0 || max === 0) return 0;
-  // Log scale: map log(count)/log(max) to 4 levels
-  const ratio = Math.log(count) / Math.log(max);
+  const ratio = isLog ? Math.log(count) / Math.log(max) : count / max;
   if (ratio <= 0.25) return 1;
   if (ratio <= 0.5) return 2;
   if (ratio <= 0.75) return 3;
@@ -63,6 +64,7 @@ function buildGrid(daily: DailyStat[]) {
 }
 
 export function ActivityHeatmap({ daily }: { daily: DailyStat[] }) {
+  const { scale, isLog, toggle } = useChartScale();
   const [tooltip, setTooltip] = useState<{
     x: number;
     y: number;
@@ -108,11 +110,14 @@ export function ActivityHeatmap({ daily }: { daily: DailyStat[] }) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
+      <CardHeader className="pb-2">
         <CardTitle className="text-base">Activity</CardTitle>
         <p className="text-xs text-muted-foreground">
           {totalSessions} sessions in the selected window &middot; {activeDays} active days
         </p>
+        <CardAction>
+          <ChartScaleToggle scale={scale} onToggle={toggle} />
+        </CardAction>
       </CardHeader>
       <CardContent className="overflow-x-auto">
         <div className="relative" style={{ minWidth: svgWidth }}>
@@ -155,7 +160,7 @@ export function ActivityHeatmap({ daily }: { daily: DailyStat[] }) {
                 <div key={wi} className="flex flex-col gap-[3px]">
                   {week.map((cell) => {
                     const sessions = cell.stat?.sessions ?? 0;
-                    const level = getLevel(sessions, maxSessions);
+                    const level = getLevel(sessions, maxSessions, isLog);
                     const isToday = cell.dateStr === formatDate(new Date());
                     const tooltipText =
                       sessions > 0

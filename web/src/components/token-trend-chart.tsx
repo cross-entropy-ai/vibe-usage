@@ -1,5 +1,5 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid } from "recharts";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChartContainer,
   ChartTooltip,
@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/chart";
 import { TOOL_NAMES, toolChartColor, toolLabel } from "@/lib/tools";
 import { fmtNum } from "@/lib/formatters";
+import { useChartScale } from "@/lib/contexts";
+import { ChartScaleToggle } from "./chart-scale-toggle";
 import type { TokensDailyEntry } from "@/types";
 
 const chartConfig = Object.fromEntries(
@@ -19,25 +21,30 @@ const chartConfig = Object.fromEntries(
   ]),
 ) satisfies ChartConfig;
 
-function transformData(data: TokensDailyEntry[]) {
+function transformData(data: TokensDailyEntry[], isLog: boolean) {
   return data.map((entry) => {
-    const row: Record<string, string | number> = { date: entry.date };
+    const row: Record<string, string | number | null> = { date: entry.date };
     for (const tool of TOOL_NAMES) {
       const t = entry.by_tool[tool];
-      row[`${tool}_total`] = t ? t.input + t.output + t.thinking : 0;
+      const total = t ? t.input + t.output + t.thinking : 0;
+      row[`${tool}_total`] = isLog ? (total > 0 ? total : null) : total;
     }
     return row;
   });
 }
 
 export function TokenTrendChart({ data }: { data: TokensDailyEntry[] }) {
-  const chartData = transformData(data);
+  const { scale, isLog, toggle } = useChartScale();
+  const chartData = transformData(data, isLog);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Token Trend</CardTitle>
         <CardDescription>Daily token usage by tool</CardDescription>
+        <CardAction>
+          <ChartScaleToggle scale={scale} onToggle={toggle} />
+        </CardAction>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
@@ -51,6 +58,9 @@ export function TokenTrendChart({ data }: { data: TokensDailyEntry[] }) {
               tick={{ fontSize: 11 }}
             />
             <YAxis
+              scale={scale}
+              domain={isLog ? [1, "auto"] : [0, "auto"]}
+              allowDataOverflow={isLog}
               tickLine={false}
               axisLine={false}
               tickFormatter={(v: number) => fmtNum(v)}
@@ -68,11 +78,12 @@ export function TokenTrendChart({ data }: { data: TokensDailyEntry[] }) {
                 key={tool}
                 dataKey={`${tool}_total`}
                 type="monotone"
-                stackId="tokens"
+                stackId={isLog ? undefined : "tokens"}
                 fill={`var(--color-${tool}_total)`}
-                fillOpacity={0.4}
+                fillOpacity={isLog ? 0.15 : 0.4}
                 stroke={`var(--color-${tool}_total)`}
                 strokeWidth={2}
+                connectNulls={false}
               />
             ))}
           </AreaChart>

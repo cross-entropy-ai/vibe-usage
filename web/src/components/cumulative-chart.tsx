@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChartContainer,
   ChartTooltip,
@@ -8,6 +8,8 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { fmtDate, fmtUsdShort } from "@/lib/formatters";
+import { useChartScale } from "@/lib/contexts";
+import { ChartScaleToggle } from "./chart-scale-toggle";
 import type { DailyStat, CostDailyEntry } from "@/types";
 
 const config = {
@@ -22,6 +24,7 @@ export function CumulativeChart({
   daily: DailyStat[];
   costDaily: CostDailyEntry[];
 }) {
+  const { scale, isLog, toggle } = useChartScale();
   const data = useMemo(() => {
     const costMap = new Map(costDaily.map((c) => [c.date, c.equivalent_api_cost_usd]));
 
@@ -58,6 +61,9 @@ export function CumulativeChart({
         <CardDescription>
           {totalSessions.toLocaleString()} sessions &middot; {fmtUsdShort(totalCost)} equivalent API cost
         </CardDescription>
+        <CardAction>
+          <ChartScaleToggle scale={scale} onToggle={toggle} />
+        </CardAction>
       </CardHeader>
       <CardContent>
         <ChartContainer config={config} className="h-[300px] w-full">
@@ -72,6 +78,9 @@ export function CumulativeChart({
             />
             <YAxis
               yAxisId="sessions"
+              scale={scale}
+              domain={isLog ? [1, "auto"] : [0, "auto"]}
+              allowDataOverflow={isLog}
               tickLine={false}
               axisLine={false}
               tickMargin={8}
@@ -79,6 +88,9 @@ export function CumulativeChart({
             <YAxis
               yAxisId="cost"
               orientation="right"
+              scale={scale}
+              domain={isLog ? [0.01, "auto"] : [0, "auto"]}
+              allowDataOverflow={isLog}
               tickFormatter={fmtUsdShort}
               tickLine={false}
               axisLine={false}

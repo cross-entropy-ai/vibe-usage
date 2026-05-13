@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChartContainer,
   ChartTooltip,
@@ -8,6 +8,8 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { fmtDate, fmtNum } from "@/lib/formatters";
+import { useChartScale } from "@/lib/contexts";
+import { ChartScaleToggle } from "./chart-scale-toggle";
 import type { DailyStat } from "@/types";
 
 const config = {
@@ -17,6 +19,7 @@ const config = {
 } satisfies ChartConfig;
 
 export function EfficiencyTrendChart({ daily }: { daily: DailyStat[] }) {
+  const { scale, isLog, toggle } = useChartScale();
   const data = useMemo(() => {
     return daily
       .filter((d) => d.sessions > 0)
@@ -40,6 +43,9 @@ export function EfficiencyTrendChart({ daily }: { daily: DailyStat[] }) {
         <CardDescription>
           Tokens/Session, Tokens/Message, and Messages/Session over time
         </CardDescription>
+        <CardAction>
+          <ChartScaleToggle scale={scale} onToggle={toggle} />
+        </CardAction>
       </CardHeader>
       <CardContent>
         <ChartContainer config={config} className="h-[300px] w-full">
@@ -54,6 +60,9 @@ export function EfficiencyTrendChart({ daily }: { daily: DailyStat[] }) {
             />
             <YAxis
               yAxisId="tokens"
+              scale={scale}
+              domain={isLog ? [1, "auto"] : [0, "auto"]}
+              allowDataOverflow={isLog}
               tickFormatter={fmtNum}
               tickLine={false}
               axisLine={false}
@@ -62,6 +71,9 @@ export function EfficiencyTrendChart({ daily }: { daily: DailyStat[] }) {
             <YAxis
               yAxisId="messages"
               orientation="right"
+              scale={scale}
+              domain={isLog ? [1, "auto"] : [0, "auto"]}
+              allowDataOverflow={isLog}
               tickLine={false}
               axisLine={false}
               tickMargin={8}

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid } from "recharts";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChartScaleToggle } from "./chart-scale-toggle";
 import {
   ChartContainer,
   ChartTooltip,
@@ -8,6 +9,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { fmtUsd } from "@/lib/formatters";
+import { useChartScale } from "@/lib/contexts";
 import type { CostDailyEntry } from "@/types";
 
 const config = {
@@ -15,7 +17,11 @@ const config = {
 } satisfies ChartConfig;
 
 export function DailyCostChart({ data }: { data: CostDailyEntry[] }) {
+  const { scale, isLog, toggle } = useChartScale();
   const chartData = useMemo(() => {
+    if (!isLog) {
+      return data.map((entry) => ({ ...entry, chart_cost: entry.equivalent_api_cost_usd }));
+    }
     const positiveValues = data
       .map((entry) => entry.equivalent_api_cost_usd)
       .filter((value) => value > 0);
@@ -26,13 +32,16 @@ export function DailyCostChart({ data }: { data: CostDailyEntry[] }) {
       ...entry,
       chart_cost: entry.equivalent_api_cost_usd > 0 ? entry.equivalent_api_cost_usd : floor,
     }));
-  }, [data]);
+  }, [data, isLog]);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Daily API Cost</CardTitle>
         <CardDescription>Equivalent API cost per day</CardDescription>
+        <CardAction>
+          <ChartScaleToggle scale={scale} onToggle={toggle} />
+        </CardAction>
       </CardHeader>
       <CardContent>
         <ChartContainer config={config} className="h-[250px] w-full">
@@ -46,8 +55,8 @@ export function DailyCostChart({ data }: { data: CostDailyEntry[] }) {
               tick={{ fontSize: 11 }}
             />
             <YAxis
-              scale="log"
-              domain={["dataMin", "auto"]}
+              scale={scale}
+              domain={isLog ? ["dataMin", "auto"] : [0, "auto"]}
               tickLine={false}
               axisLine={false}
               tickFormatter={(v: number) => fmtUsd(v)}

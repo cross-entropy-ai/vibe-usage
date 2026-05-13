@@ -1,5 +1,6 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChartScaleToggle } from "./chart-scale-toggle";
 import {
   ChartContainer,
   ChartTooltip,
@@ -9,6 +10,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { fmtNum } from "@/lib/formatters";
+import { useChartScale } from "@/lib/contexts";
 import type { ModelTokens } from "@/types";
 
 const config = {
@@ -31,7 +33,7 @@ function shortenModels(names: string[]): string[] {
 }
 
 export function ModelsChart({ data, limit = 12 }: { data: ModelTokens[]; limit?: number }) {
-  // Filter out models with no output or thinking tokens, then nullify zeros for log scale
+  const { scale, domain, isLog, toggle } = useChartScale();
   const slice = data
     .filter((d) => d.output_tokens > 0 || d.thinking_tokens > 0)
     .slice(0, limit);
@@ -39,22 +41,25 @@ export function ModelsChart({ data, limit = 12 }: { data: ModelTokens[]; limit?:
   const top = slice.map((d, i) => ({
     ...d,
     model: labels[i],
-    output_tokens: d.output_tokens || null,
-    thinking_tokens: d.thinking_tokens || null,
+    output_tokens: isLog ? (d.output_tokens || null) : d.output_tokens,
+    thinking_tokens: isLog ? (d.thinking_tokens || null) : d.thinking_tokens,
   }));
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Tokens by Model</CardTitle>
-        <CardDescription>Top models by output and thinking tokens on a log scale</CardDescription>
+        <CardDescription>{isLog ? "Top models by output and thinking tokens on a log scale" : "Top models by output and thinking tokens"}</CardDescription>
+        <CardAction>
+          <ChartScaleToggle scale={scale} onToggle={toggle} />
+        </CardAction>
       </CardHeader>
       <CardContent>
         <ChartContainer config={config} className="h-[350px] w-full">
           <LineChart data={top} layout="vertical" accessibilityLayer margin={{ left: 20, right: 12 }}>
             <CartesianGrid horizontal={false} />
             <YAxis dataKey="model" type="category" width={140} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-            <XAxis type="number" scale="log" domain={[1, "auto"]} tickFormatter={fmtNum} tickLine={false} axisLine={false} />
+            <XAxis type="number" scale={scale} domain={domain} tickFormatter={fmtNum} tickLine={false} axisLine={false} />
             <ChartTooltip content={<ChartTooltipContent />} />
             <ChartLegend content={<ChartLegendContent />} />
             <Line

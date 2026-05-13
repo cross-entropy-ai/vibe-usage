@@ -2,7 +2,6 @@ import { useSummary, useCost } from "@/lib/contexts";
 import { CumulativeChart } from "@/components/cumulative-chart";
 import { CostOverview } from "@/components/cost-overview";
 import { DailyCostChart } from "@/components/daily-cost-chart";
-import { TokenFlowChart } from "@/components/token-flow-chart";
 
 export function CostSection() {
   const summary = useSummary();
@@ -17,7 +16,6 @@ export function CostSection() {
         </div>
       )}
       {cost && <CostOverview data={cost} />}
-      {cost && <TokenFlowChart data={cost.by_model} />}
     </>
   );
 }
