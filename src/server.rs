@@ -26,6 +26,17 @@ struct BashHistoryQuery {
     offset: Option<usize>,
 }
 
+#[derive(Deserialize, Default)]
+struct SessionsListQuery {
+    project: Option<String>,
+    tool: Option<String>,
+    q: Option<String>,
+    from: Option<String>,
+    to: Option<String>,
+    limit: Option<usize>,
+    offset: Option<usize>,
+}
+
 #[derive(serde::Serialize)]
 struct HostToolStat {
     tool: String,
@@ -68,6 +79,8 @@ struct ApiInfoResponse {
 
 const ENDPOINTS: &[EndpointInfo] = &[
     EndpointInfo { method: "GET", path: "/api/sessions", description: "Raw sessions with optional filters and pagination" },
+    EndpointInfo { method: "GET", path: "/api/sessions/list", description: "Lightweight session summaries with title, message/token totals; supports project/tool/q filters" },
+    EndpointInfo { method: "GET", path: "/api/sessions/:id", description: "Full Session record (all messages) for one session id" },
     EndpointInfo { method: "GET", path: "/api/summary", description: "Top-level totals plus per-day sessions/messages/tokens" },
     EndpointInfo { method: "GET", path: "/api/tokens/daily", description: "Daily token totals split by tool" },
     EndpointInfo { method: "GET", path: "/api/tokens/by-model", description: "Per-model output/thinking token totals" },
@@ -112,6 +125,54 @@ async fn api_sessions(
         "count": sessions.len(),
         "sessions": sessions,
     }))
+}
+
+struct PricingAdapter<'a>(&'a dyn crate::pricing::PricingProvider);
+
+impl<'a> analytics::PricingLookup for PricingAdapter<'a> {
+    fn input_output(&self, model: &str) -> Option<(f64, f64)> {
+        self.0
+            .price_for(model)
+            .map(|p| (p.input_cost_per_token, p.output_cost_per_token))
+    }
+}
+
+async fn api_sessions_list(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<SessionsListQuery>,
+) -> Json<serde_json::Value> {
+    let sessions = filter_by_date(
+        &collect_sessions(&state).await,
+        &DateRange { from: q.from.clone(), to: q.to.clone() },
+    );
+    let list_q = analytics::ListQuery {
+        project: q.project.clone(),
+        tool: q.tool.clone(),
+        q: q.q.clone(),
+        limit: q.limit.unwrap_or(200),
+        offset: q.offset.unwrap_or(0),
+    };
+    Json(serde_json::to_value(analytics::build_list(&sessions, &list_q)).unwrap())
+}
+
+async fn api_session_detail(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Response {
+    let sessions = collect_sessions(&state).await;
+    match sessions.iter().find(|s| s.id == id) {
+        Some(s) => {
+            let cost = analytics::estimated_cost_usd(s, &PricingAdapter(state.pricing.as_ref()));
+            let mut v = serde_json::to_value(s).unwrap();
+            v["estimated_cost_usd"] = serde_json::json!(cost);
+            Json(v).into_response()
+        }
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "not found"})),
+        )
+            .into_response(),
+    }
 }
 
 async fn api_summary(
@@ -442,6 +503,8 @@ pub async fn serve(
 
     let app = Router::new()
         .route("/api/sessions", get(api_sessions))
+        .route("/api/sessions/list", get(api_sessions_list))
+        .route("/api/sessions/{id}", get(api_session_detail))
         .route("/api/summary", get(api_summary))
         .route("/api/tokens/daily", get(api_tokens_daily))
         .route("/api/tokens/by-model", get(api_tokens_by_model))
