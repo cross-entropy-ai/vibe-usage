@@ -1,6 +1,56 @@
 import { useEffect, useRef, useState } from "react";
-import type { SessionDetail as SessionDetailType } from "@/types/sessions";
+import type {
+  SessionDetail as SessionDetailType,
+  SessionMessage,
+  ToolCall,
+} from "@/types/sessions";
 import { MessageBubble } from "./message-bubble";
+import { ToolCallGroup } from "./tool-call-group";
+
+type RenderUnit =
+  | { kind: "message"; msg: SessionMessage; key: string }
+  | { kind: "tool-run"; calls: ToolCall[]; key: string };
+
+function isToolOnlyAssistant(m: SessionMessage): boolean {
+  return (
+    m.role === "assistant" &&
+    m.tool_calls.length > 0 &&
+    !m.content.trim()
+  );
+}
+
+function buildUnits(messages: SessionMessage[], sessionId: string): RenderUnit[] {
+  const units: RenderUnit[] = [];
+  let runStart = -1;
+  let runCalls: ToolCall[] = [];
+
+  const flushRun = () => {
+    if (runStart < 0) return;
+    units.push({
+      kind: "tool-run",
+      calls: runCalls,
+      key: `${sessionId}-run-${runStart}`,
+    });
+    runStart = -1;
+    runCalls = [];
+  };
+
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i];
+    if (isToolOnlyAssistant(m)) {
+      if (runStart < 0) {
+        runStart = i;
+        runCalls = [];
+      }
+      runCalls.push(...m.tool_calls);
+    } else {
+      flushRun();
+      units.push({ kind: "message", msg: m, key: `${sessionId}-msg-${i}` });
+    }
+  }
+  flushRun();
+  return units;
+}
 
 const INITIAL_RENDER = 50;
 const PAGE_INC = 50;
@@ -105,13 +155,25 @@ export function SessionDetail({
 
       <div className="flex-1 overflow-y-auto p-3">
         <div className="space-y-2">
-          {visible.map((m, i) => (
-            <MessageBubble
-              key={`${detail.id}-${i}`}
-              message={m}
-              forceToolDetails={showToolDetails}
-            />
-          ))}
+          {buildUnits(visible, detail.id).map((unit) =>
+            unit.kind === "message" ? (
+              <MessageBubble
+                key={unit.key}
+                message={unit.msg}
+                forceToolDetails={showToolDetails}
+              />
+            ) : (
+              <div key={unit.key} className="rounded-md bg-slate-50/60 px-3 py-2">
+                <div className="mb-1.5 text-[11px] font-medium text-slate-500">
+                  🤖 assistant
+                </div>
+                <ToolCallGroup
+                  calls={unit.calls}
+                  forceOpen={showToolDetails}
+                />
+              </div>
+            ),
+          )}
         </div>
         {renderCount < detail.messages.length && (
           <div ref={sentinelRef} className="py-4 text-center text-[11px] text-slate-400">

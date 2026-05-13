@@ -1,6 +1,6 @@
 import type { SessionMessage } from "@/types/sessions";
 import { Markdown } from "./markdown";
-import { ToolCallRow } from "./tool-call-row";
+import { ToolCallGroup } from "./tool-call-group";
 
 export function MessageBubble({
   message,
@@ -47,10 +47,8 @@ export function MessageBubble({
       </div>
       {message.content && <Markdown>{message.content}</Markdown>}
       {message.tool_calls.length > 0 && (
-        <div className="mt-2 space-y-1">
-          {message.tool_calls.map((call, i) => (
-            <ToolCallRow key={i} call={call} forceOpen={forceToolDetails} />
-          ))}
+        <div className="mt-2">
+          <ToolCallGroup calls={message.tool_calls} forceOpen={forceToolDetails} />
         </div>
       )}
     </div>
