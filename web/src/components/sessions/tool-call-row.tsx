@@ -3,14 +3,23 @@ import { ChevronRight } from "lucide-react";
 import type { ToolCall } from "@/types/sessions";
 
 function previewArgs(call: ToolCall): string {
-  if (!call.args) return "";
-  if (typeof call.args === "string") return call.args;
-  const str = JSON.stringify(call.args);
-  return str.length > 50 ? str.slice(0, 50) + "..." : str;
+  const args = call.args;
+  if (args == null || typeof args !== "object") return "";
+  const obj = args as Record<string, unknown>;
+  for (const key of ["file_path", "path", "command", "pattern", "url", "query"]) {
+    const v = obj[key];
+    if (typeof v === "string" && v.length > 0) return v;
+  }
+  const json = JSON.stringify(obj);
+  return json.length > 80 ? json.slice(0, 77) + "…" : json;
 }
 
 function formatJson(value: unknown): string {
-  return JSON.stringify(value, null, 2);
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
 }
 
 export function ToolCallRow({ call, forceOpen }: { call: ToolCall; forceOpen?: boolean }) {
