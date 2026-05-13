@@ -175,3 +175,102 @@ fn match_session_preview_preserves_original_case() {
         "preview should keep original case, got: {preview}"
     );
 }
+
+fn make_session(id: &str, project: Option<&str>, user_text: &str) -> Session {
+    let mut s = session_with_messages(vec![msg(Role::User, user_text)]);
+    s.id = id.to_string();
+    s.project = project.map(|p| p.to_string());
+    s
+}
+
+#[test]
+fn build_list_filters_by_project_tool_and_query() {
+    let sessions = vec![
+        make_session("a", Some("vibe-usage"), "cache stuff here"),
+        make_session("b", Some("vibe-usage"), "unrelated"),
+        make_session("c", Some("other"), "cache stuff in other"),
+        make_session("d", None, "no project"),
+    ];
+
+    // Project filter
+    let q = sessions_view::ListQuery {
+        project: Some("vibe-usage".to_string()),
+        tool: None,
+        q: None,
+        limit: 100,
+        offset: 0,
+    };
+    let resp = sessions_view::build_list(&sessions, &q);
+    assert_eq!(resp.total, 2);
+    let ids: Vec<&str> = resp.sessions.iter().map(|s| s.id.as_str()).collect();
+    assert!(ids.contains(&"a") && ids.contains(&"b"));
+
+    // No-project pseudo-value
+    let q = sessions_view::ListQuery {
+        project: Some("__none__".to_string()),
+        tool: None,
+        q: None,
+        limit: 100,
+        offset: 0,
+    };
+    let resp = sessions_view::build_list(&sessions, &q);
+    assert_eq!(resp.total, 1);
+    assert_eq!(resp.sessions[0].id, "d");
+
+    // Query filter applied
+    let q = sessions_view::ListQuery {
+        project: None,
+        tool: None,
+        q: Some("cache".to_string()),
+        limit: 100,
+        offset: 0,
+    };
+    let resp = sessions_view::build_list(&sessions, &q);
+    assert_eq!(resp.total, 2);
+    for item in &resp.sessions {
+        assert!(item.match_count > 0);
+        assert!(item.match_preview.is_some());
+    }
+}
+
+#[test]
+fn build_list_paginates_and_orders_newest_first() {
+    use chrono::Duration;
+    let mut sessions = Vec::new();
+    for i in 0..5 {
+        let mut s = make_session(&format!("s{i}"), None, "x");
+        s.start_time = ts() + Duration::hours(i);
+        sessions.push(s);
+    }
+    let q = sessions_view::ListQuery {
+        project: None,
+        tool: None,
+        q: None,
+        limit: 2,
+        offset: 1,
+    };
+    let resp = sessions_view::build_list(&sessions, &q);
+    assert_eq!(resp.total, 5);
+    assert_eq!(resp.count, 2);
+    assert_eq!(resp.sessions[0].id, "s3");
+    assert_eq!(resp.sessions[1].id, "s2");
+}
+
+#[test]
+fn build_list_populates_summary_fields() {
+    let mut s = session_with_messages(vec![
+        msg(Role::User, "hello world"),
+        msg_with_tokens(Role::Assistant, 100, 50, None),
+    ]);
+    s.id = "only".to_string();
+    let resp = sessions_view::build_list(
+        &[s],
+        &sessions_view::ListQuery::default(),
+    );
+    assert_eq!(resp.total, 1);
+    let item = &resp.sessions[0];
+    assert_eq!(item.title, "hello world");
+    assert_eq!(item.message_count, 2);
+    assert_eq!(item.token_total, 150);
+    assert_eq!(item.tool, "claude");
+}

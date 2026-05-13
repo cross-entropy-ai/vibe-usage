@@ -86,6 +86,141 @@ pub fn match_session(session: &Session, terms_lower: &[&str]) -> Option<MatchRes
     })
 }
 
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+
+const NO_PROJECT_KEY: &str = "__none__";
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ListQuery {
+    pub project: Option<String>,
+    pub tool: Option<String>,
+    pub q: Option<String>,
+    #[serde(default = "default_limit")]
+    pub limit: usize,
+    #[serde(default)]
+    pub offset: usize,
+}
+
+fn default_limit() -> usize {
+    200
+}
+
+impl Default for ListQuery {
+    fn default() -> Self {
+        Self {
+            project: None,
+            tool: None,
+            q: None,
+            limit: default_limit(),
+            offset: 0,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct SessionListItem {
+    pub id: String,
+    pub tool: String,
+    pub project: Option<String>,
+    pub model: Option<String>,
+    pub start_time: DateTime<Utc>,
+    pub message_count: usize,
+    pub token_total: u64,
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub match_preview: Option<String>,
+    pub match_count: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SessionListResponse {
+    pub total: usize,
+    pub offset: usize,
+    pub count: usize,
+    pub sessions: Vec<SessionListItem>,
+}
+
+pub fn build_list(sessions: &[Session], q: &ListQuery) -> SessionListResponse {
+    let terms_lower: Vec<String> = q
+        .q
+        .as_deref()
+        .map(|s| {
+            s.split_whitespace()
+                .map(|t| t.to_lowercase())
+                .collect()
+        })
+        .unwrap_or_default();
+    let terms_ref: Vec<&str> = terms_lower.iter().map(|s| s.as_str()).collect();
+
+    let mut filtered: Vec<(SessionListItem, DateTime<Utc>)> = Vec::new();
+
+    for s in sessions {
+        if let Some(proj) = &q.project {
+            let matches_proj = match s.project.as_deref() {
+                Some(p) => proj == p,
+                None => proj == NO_PROJECT_KEY,
+            };
+            if !matches_proj {
+                continue;
+            }
+        }
+        if let Some(tool) = &q.tool {
+            if s.tool.to_string() != *tool {
+                continue;
+            }
+        }
+
+        let match_result = if terms_ref.is_empty() {
+            None
+        } else {
+            match match_session(s, &terms_ref) {
+                Some(m) => Some(m),
+                None => continue, // search active but no hit -> drop
+            }
+        };
+
+        let (match_preview, match_count) = match match_result {
+            Some(m) => (m.preview, m.match_count),
+            None => (None, 0),
+        };
+
+        let item = SessionListItem {
+            id: s.id.clone(),
+            tool: s.tool.to_string(),
+            project: s.project.clone(),
+            model: s.model.clone(),
+            start_time: s.start_time,
+            message_count: s.messages.len(),
+            token_total: token_total(s),
+            title: extract_title(s),
+            match_preview,
+            match_count,
+        };
+        filtered.push((item, s.start_time));
+    }
+
+    // Newest first
+    filtered.sort_by(|a, b| b.1.cmp(&a.1));
+
+    let total = filtered.len();
+    let offset = q.offset.min(total);
+    let limit = q.limit.min(2000);
+    let page: Vec<SessionListItem> = filtered
+        .into_iter()
+        .skip(offset)
+        .take(limit)
+        .map(|(item, _)| item)
+        .collect();
+
+    SessionListResponse {
+        total,
+        offset,
+        count: page.len(),
+        sessions: page,
+    }
+}
+
 fn build_preview(content: &str, byte_idx: usize, match_len: usize) -> String {
     let start = content[..byte_idx]
         .char_indices()
