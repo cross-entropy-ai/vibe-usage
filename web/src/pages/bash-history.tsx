@@ -1191,33 +1191,44 @@ function ChainsGraph({
         const a = nodeByIdRef.current.get(e.from);
         const b = nodeByIdRef.current.get(e.to);
         if (!a || !b) return null;
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const ux = dx / dist;
-        const uy = dy / dist;
-        const sx = a.x + ux * a.r;
-        const sy = a.y + uy * a.r;
-        const tx = b.x - ux * (b.r + 2);
-        const ty = b.y - uy * (b.r + 2);
-        // Thickness now driven by P(to|from). Use sqrt to keep small ones visible.
+        // Thickness driven by P(to|from). Use sqrt to keep small ones visible.
         const w = 0.6 + Math.sqrt(e.probability / maxProb) * 6;
         const opacity = 0.3 + (e.probability / maxProb) * 0.5;
+        const isSelfLoop = e.from === e.to;
 
-        const mutual = isMutual(e.from, e.to);
         let pathD: string;
-        if (mutual) {
-          // Curve perpendicular to the line; sign depends on direction so the
-          // two halves of the pair bow outward.
-          const midX = (sx + tx) / 2;
-          const midY = (sy + ty) / 2;
-          const sign = e.from < e.to ? 1 : -1;
-          const offset = Math.max(18, dist * 0.18) * sign;
-          const cx = midX + -uy * offset;
-          const cy = midY + ux * offset;
-          pathD = `M ${sx} ${sy} Q ${cx} ${cy} ${tx} ${ty}`;
+        if (isSelfLoop) {
+          // Loop arc anchored on the top of the node. No arrow marker (the
+          // direction is implicit and a degenerate marker flickers).
+          const r = a.r;
+          const sx = a.x - r * 0.55;
+          const sy = a.y - r * 0.84;
+          const tx = a.x + r * 0.55;
+          const ty = sy;
+          const loopR = r * 0.9;
+          pathD = `M ${sx} ${sy} A ${loopR} ${loopR} 0 1 1 ${tx} ${ty}`;
         } else {
-          pathD = `M ${sx} ${sy} L ${tx} ${ty}`;
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const ux = dx / dist;
+          const uy = dy / dist;
+          const sx = a.x + ux * a.r;
+          const sy = a.y + uy * a.r;
+          const tx = b.x - ux * (b.r + 2);
+          const ty = b.y - uy * (b.r + 2);
+          const mutual = isMutual(e.from, e.to);
+          if (mutual) {
+            const midX = (sx + tx) / 2;
+            const midY = (sy + ty) / 2;
+            const sign = e.from < e.to ? 1 : -1;
+            const offset = Math.max(18, dist * 0.18) * sign;
+            const cx = midX + -uy * offset;
+            const cy = midY + ux * offset;
+            pathD = `M ${sx} ${sy} Q ${cx} ${cy} ${tx} ${ty}`;
+          } else {
+            pathD = `M ${sx} ${sy} L ${tx} ${ty}`;
+          }
         }
 
         return (
@@ -1228,7 +1239,7 @@ function ChainsGraph({
             strokeWidth={w}
             strokeOpacity={opacity}
             fill="none"
-            markerEnd="url(#chain-arrow)"
+            markerEnd={isSelfLoop ? undefined : "url(#chain-arrow)"}
           >
             <title>{`${e.from} → ${e.to}: P=${(e.probability * 100).toFixed(1)}% (${fmtNum(e.count)} of ${fmtNum(Math.round(e.count / Math.max(e.probability, 0.0001)))})`}</title>
           </path>
