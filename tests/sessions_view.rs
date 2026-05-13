@@ -74,3 +74,38 @@ fn extract_title_falls_back_when_no_user_message() {
     let s = session_with_messages(vec![msg(Role::Assistant, "only assistant")]);
     assert_eq!(sessions_view::extract_title(&s), "(no prompt)");
 }
+
+use schema::TokenUsage;
+
+fn msg_with_tokens(role: Role, input: u64, output: u64, thinking: Option<u64>) -> Message {
+    Message {
+        role,
+        content: String::new(),
+        timestamp: ts(),
+        model: None,
+        tokens: Some(TokenUsage {
+            input: Some(input),
+            output: Some(output),
+            thinking,
+            cache_read: Some(999),    // must be excluded
+            cache_write: Some(999),   // must be excluded
+        }),
+        duration_ms: None,
+        tool_calls: vec![],
+    }
+}
+
+#[test]
+fn token_total_sums_input_output_thinking_only() {
+    let s = session_with_messages(vec![
+        msg_with_tokens(Role::Assistant, 100, 50, Some(20)),
+        msg_with_tokens(Role::Assistant, 10, 5, None),
+    ]);
+    assert_eq!(sessions_view::token_total(&s), 100 + 50 + 20 + 10 + 5);
+}
+
+#[test]
+fn token_total_handles_missing_usage() {
+    let s = session_with_messages(vec![msg(Role::Assistant, "no usage")]);
+    assert_eq!(sessions_view::token_total(&s), 0);
+}

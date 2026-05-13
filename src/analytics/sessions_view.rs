@@ -29,3 +29,14 @@ fn truncate_title(s: &str) -> String {
         out
     }
 }
+
+pub fn token_total(session: &Session) -> u64 {
+    session
+        .messages
+        .iter()
+        .filter_map(|m| m.tokens.as_ref())
+        .map(|t| {
+            t.input.unwrap_or(0) + t.output.unwrap_or(0) + t.thinking.unwrap_or(0)
+        })
+        .sum()
+}
