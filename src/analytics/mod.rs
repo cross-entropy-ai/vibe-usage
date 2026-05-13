@@ -9,6 +9,7 @@ mod cost;
 mod insights;
 mod projects;
 mod projector;
+mod sessions_view;
 mod summary;
 mod tokens;
 
@@ -18,6 +19,7 @@ pub use cost::*;
 pub use insights::*;
 pub use projects::*;
 pub use projector::*;
+pub use sessions_view::*;
 pub use summary::*;
 pub use tokens::*;
 
