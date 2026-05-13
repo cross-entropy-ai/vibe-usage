@@ -75,7 +75,7 @@ fn parse_sessions(state: &AppState) -> Vec<Session> {
                 .data_dir
                 .join("cache")
                 .join(host_name.as_deref().unwrap_or("unknown"))
-                .join(format!("{}.bin", c.name()));
+                .join(format!("{}.json", c.name()));
 
             let result = crate::cache::cached_parse(c.as_ref(), &raw_dir, &cache_path);
 

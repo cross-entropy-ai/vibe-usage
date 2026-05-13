@@ -22,17 +22,17 @@ struct CacheStore {
 
 impl CacheStore {
     fn load(path: &Path) -> Self {
-        fs::read(path)
-            .ok()
-            .and_then(|bytes| bincode::deserialize(&bytes).ok())
-            .unwrap_or_default()
+        match fs::read(path) {
+            Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_default(),
+            Err(_) => Self::default(),
+        }
     }
 
     fn save(&self, path: &Path) {
         if let Some(parent) = path.parent() {
             let _ = fs::create_dir_all(parent);
         }
-        if let Ok(bytes) = bincode::serialize(self) {
+        if let Ok(bytes) = serde_json::to_vec(self) {
             let _ = fs::write(path, bytes);
         }
     }
