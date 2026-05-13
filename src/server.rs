@@ -8,12 +8,92 @@ use axum::{
     routing::get,
 };
 use rust_embed::Embed;
+use serde::Deserialize;
 use tower_http::cors::CorsLayer;
 
 use crate::analytics;
 use crate::query::{
     AppState, DateRange, SessionFilter, collect_sessions, filter_by_date, filter_sessions, paginate,
 };
+
+#[derive(Deserialize, Default)]
+struct BashHistoryQuery {
+    from: Option<String>,
+    to: Option<String>,
+    tool: Option<String>,
+    q: Option<String>,
+    limit: Option<usize>,
+    offset: Option<usize>,
+}
+
+#[derive(serde::Serialize)]
+struct HostToolStat {
+    tool: String,
+    sessions: usize,
+    files: usize,
+    bytes: u64,
+}
+
+#[derive(serde::Serialize)]
+struct HostInfo {
+    hostname: String,
+    total_sessions: usize,
+    last_activity: Option<String>,
+    first_activity: Option<String>,
+    tools: Vec<HostToolStat>,
+}
+
+#[derive(serde::Serialize, Clone, Copy)]
+struct EndpointInfo {
+    method: &'static str,
+    path: &'static str,
+    description: &'static str,
+}
+
+#[derive(serde::Serialize)]
+struct ServerInfo {
+    version: &'static str,
+    data_dir: String,
+    raw_dir: String,
+    cache_dir: String,
+    collectors: Vec<String>,
+}
+
+#[derive(serde::Serialize)]
+struct ApiInfoResponse {
+    server: ServerInfo,
+    hosts: Vec<HostInfo>,
+    endpoints: Vec<EndpointInfo>,
+}
+
+const ENDPOINTS: &[EndpointInfo] = &[
+    EndpointInfo { method: "GET", path: "/api/sessions", description: "Raw sessions with optional filters and pagination" },
+    EndpointInfo { method: "GET", path: "/api/summary", description: "Top-level totals plus per-day sessions/messages/tokens" },
+    EndpointInfo { method: "GET", path: "/api/tokens/daily", description: "Daily token totals split by tool" },
+    EndpointInfo { method: "GET", path: "/api/tokens/by-model", description: "Per-model output/thinking token totals" },
+    EndpointInfo { method: "GET", path: "/api/tools/usage", description: "Tool-call frequencies across all sessions" },
+    EndpointInfo { method: "GET", path: "/api/tools/status", description: "Success vs error counts per tool" },
+    EndpointInfo { method: "GET", path: "/api/projects", description: "Project breakdown: sessions, tokens, last activity" },
+    EndpointInfo { method: "GET", path: "/api/hosts", description: "Per-host session and token totals" },
+    EndpointInfo { method: "GET", path: "/api/duration", description: "Daily session-duration totals" },
+    EndpointInfo { method: "GET", path: "/api/activity/heatmap", description: "Session starts bucketed by weekday × hour" },
+    EndpointInfo { method: "GET", path: "/api/cost", description: "Equivalent API cost plus subscription savings, with daily breakdown" },
+    EndpointInfo { method: "GET", path: "/api/messages/latency", description: "Assistant message latency distribution" },
+    EndpointInfo { method: "GET", path: "/api/git/activity", description: "Sessions per git repository" },
+    EndpointInfo { method: "GET", path: "/api/directories", description: "Sessions per working directory" },
+    EndpointInfo { method: "GET", path: "/api/insights/conversations", description: "Depth and message-length histograms" },
+    EndpointInfo { method: "GET", path: "/api/insights/cache-efficiency", description: "Cache-read vs cache-write per tool" },
+    EndpointInfo { method: "GET", path: "/api/insights/thinking", description: "Thinking-token usage per model" },
+    EndpointInfo { method: "GET", path: "/api/insights/toolchains", description: "Common sequential tool-call chains" },
+    EndpointInfo { method: "GET", path: "/api/insights/model-switches", description: "Mid-session model switch rate" },
+    EndpointInfo { method: "GET", path: "/api/insights/languages", description: "Detected language and task-type for first user message" },
+    EndpointInfo { method: "GET", path: "/api/insights/session-complexity", description: "Avg messages per session by hour" },
+    EndpointInfo { method: "GET", path: "/api/bash-history", description: "Paginated list of every shell command run by an agent" },
+    EndpointInfo { method: "GET", path: "/api/bash-history/stats", description: "Aggregate stats: features, complexity, behavior, per-project" },
+    EndpointInfo { method: "GET", path: "/api/projector/models", description: "Catalog of model pricing for the cost projector" },
+    EndpointInfo { method: "GET", path: "/api/projector/usage-summary", description: "Usage totals used to project costs onto other models" },
+    EndpointInfo { method: "GET", path: "/api/info", description: "Server metadata, connected hosts, and registered endpoints" },
+];
 
 #[derive(Embed)]
 #[folder = "web/dist"]
@@ -140,6 +220,163 @@ async fn api_directories(
     Json(serde_json::to_value(analytics::directories(&sessions)).unwrap())
 }
 
+async fn api_bash_history(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<BashHistoryQuery>,
+) -> Json<serde_json::Value> {
+    let range = DateRange {
+        from: q.from.clone(),
+        to: q.to.clone(),
+    };
+    let mut sessions = filter_by_date(&collect_sessions(&state).await, &range);
+    if let Some(tool) = &q.tool {
+        sessions.retain(|s| s.tool.to_string() == *tool);
+    }
+    let offset = q.offset.unwrap_or(0);
+    let limit = q.limit.unwrap_or(200).min(2000);
+    Json(
+        serde_json::to_value(analytics::bash_history(
+            &sessions,
+            offset,
+            limit,
+            q.q.as_deref(),
+        ))
+        .unwrap(),
+    )
+}
+
+async fn api_info(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
+    use std::collections::BTreeMap;
+
+    let raw_root = state.data_dir.join("raw");
+    let cache_dir = state.data_dir.join("cache");
+
+    // Walk raw_root to count files and bytes per (host, tool).
+    let mut fs_stats: BTreeMap<(String, String), (usize, u64)> = BTreeMap::new();
+    if let Ok(host_entries) = std::fs::read_dir(&raw_root) {
+        for host_entry in host_entries.flatten() {
+            let host = host_entry.file_name().to_string_lossy().to_string();
+            if let Ok(tool_entries) = std::fs::read_dir(host_entry.path()) {
+                for tool_entry in tool_entries.flatten() {
+                    let tool = tool_entry.file_name().to_string_lossy().to_string();
+                    let mut files = 0usize;
+                    let mut bytes = 0u64;
+                    walk_count(&tool_entry.path(), &mut files, &mut bytes);
+                    fs_stats.insert((host.clone(), tool), (files, bytes));
+                }
+            }
+        }
+    }
+
+    // Aggregate session counts per (host, tool) from the cache.
+    let sessions = collect_sessions(&state).await;
+    let mut session_counts: BTreeMap<(String, String), usize> = BTreeMap::new();
+    let mut host_last: BTreeMap<String, chrono::DateTime<chrono::Utc>> = BTreeMap::new();
+    let mut host_first: BTreeMap<String, chrono::DateTime<chrono::Utc>> = BTreeMap::new();
+    for s in sessions.iter() {
+        let host = s.hostname.clone().unwrap_or_else(|| "unknown".to_string());
+        *session_counts
+            .entry((host.clone(), s.tool.to_string()))
+            .or_default() += 1;
+        host_last
+            .entry(host.clone())
+            .and_modify(|e| {
+                if s.start_time > *e {
+                    *e = s.start_time;
+                }
+            })
+            .or_insert(s.start_time);
+        host_first
+            .entry(host)
+            .and_modify(|e| {
+                if s.start_time < *e {
+                    *e = s.start_time;
+                }
+            })
+            .or_insert(s.start_time);
+    }
+
+    let mut hosts_map: BTreeMap<String, Vec<HostToolStat>> = BTreeMap::new();
+    for ((host, tool), (files, bytes)) in &fs_stats {
+        let sessions = session_counts.get(&(host.clone(), tool.clone())).copied().unwrap_or(0);
+        hosts_map.entry(host.clone()).or_default().push(HostToolStat {
+            tool: tool.clone(),
+            sessions,
+            files: *files,
+            bytes: *bytes,
+        });
+    }
+    // Include hosts that exist in cache but have no raw dir.
+    for (host, _) in &host_last {
+        hosts_map.entry(host.clone()).or_default();
+    }
+
+    let mut hosts: Vec<HostInfo> = hosts_map
+        .into_iter()
+        .map(|(hostname, mut tools)| {
+            tools.sort_by(|a, b| b.sessions.cmp(&a.sessions));
+            let total_sessions = tools.iter().map(|t| t.sessions).sum();
+            HostInfo {
+                last_activity: host_last.get(&hostname).map(|t| t.to_rfc3339()),
+                first_activity: host_first.get(&hostname).map(|t| t.to_rfc3339()),
+                hostname,
+                total_sessions,
+                tools,
+            }
+        })
+        .collect();
+    hosts.sort_by(|a, b| b.total_sessions.cmp(&a.total_sessions));
+
+    let info = ApiInfoResponse {
+        server: ServerInfo {
+            version: env!("CARGO_PKG_VERSION"),
+            data_dir: state.data_dir.to_string_lossy().to_string(),
+            raw_dir: raw_root.to_string_lossy().to_string(),
+            cache_dir: cache_dir.to_string_lossy().to_string(),
+            collectors: state.collectors.iter().map(|c| c.name().to_string()).collect(),
+        },
+        hosts,
+        endpoints: ENDPOINTS.to_vec(),
+    };
+
+    Json(serde_json::to_value(info).unwrap())
+}
+
+fn walk_count(path: &std::path::Path, files: &mut usize, bytes: &mut u64) {
+    if let Ok(entries) = std::fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if let Ok(md) = entry.metadata() {
+                if md.is_dir() {
+                    walk_count(&p, files, bytes);
+                } else if md.is_file() {
+                    *files += 1;
+                    *bytes += md.len();
+                }
+            }
+        }
+    }
+}
+
+async fn api_bash_history_stats(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<BashHistoryQuery>,
+) -> Json<serde_json::Value> {
+    let range = DateRange {
+        from: q.from.clone(),
+        to: q.to.clone(),
+    };
+    let sessions = filter_by_date(&collect_sessions(&state).await, &range);
+    Json(
+        serde_json::to_value(analytics::bash_stats(
+            &sessions,
+            q.tool.as_deref(),
+            q.q.as_deref(),
+        ))
+        .unwrap(),
+    )
+}
+
 async fn api_projector_models(
     State(state): State<Arc<AppState>>,
 ) -> Json<serde_json::Value> {
@@ -218,6 +455,9 @@ pub async fn serve(
         .route("/api/tools/status", get(api_tools_status))
         .route("/api/git/activity", get(api_git_activity))
         .route("/api/directories", get(api_directories))
+        .route("/api/bash-history", get(api_bash_history))
+        .route("/api/bash-history/stats", get(api_bash_history_stats))
+        .route("/api/info", get(api_info))
         .route("/api/projector/models", get(api_projector_models))
         .route("/api/projector/usage-summary", get(api_projector_usage_summary))
         .merge(crate::insights::router())

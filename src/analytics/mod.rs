@@ -4,6 +4,7 @@
 //! and returns a typed, `Serialize`-able struct.
 
 mod activity;
+mod bash_history;
 mod cost;
 mod insights;
 mod projects;
@@ -12,6 +13,7 @@ mod summary;
 mod tokens;
 
 pub use activity::*;
+pub use bash_history::*;
 pub use cost::*;
 pub use insights::*;
 pub use projects::*;

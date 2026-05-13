@@ -22,6 +22,7 @@ import {
 } from "@/lib/formatters";
 import { TOOL_NAMES, type Tool, toolLabel } from "@/lib/tools";
 import { useScaleMode } from "@/lib/contexts";
+import { InfoDialog } from "@/components/info-dialog";
 import type {
   CostData,
   Summary,
@@ -200,13 +201,20 @@ export function DashboardHeader({
                   Cost, throughput, runtime behavior, and workspace concentration
                   for coding agents across Claude, Gemini, Codex, and Kimi.
                 </CardDescription>
-                <div className="mt-3">
+                <div className="mt-3 flex flex-wrap gap-2">
                   <Link
                     to="/projector"
                     className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900"
                   >
                     Cost Projector →
                   </Link>
+                  <Link
+                    to="/bash-history"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900"
+                  >
+                    Bash History →
+                  </Link>
+                  <InfoDialog />
                 </div>
               </div>
               <ScaleToggle />
