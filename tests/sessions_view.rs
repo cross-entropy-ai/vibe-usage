@@ -109,3 +109,51 @@ fn token_total_handles_missing_usage() {
     let s = session_with_messages(vec![msg(Role::Assistant, "no usage")]);
     assert_eq!(sessions_view::token_total(&s), 0);
 }
+
+#[test]
+fn match_session_returns_none_when_query_absent() {
+    let s = session_with_messages(vec![msg(Role::User, "anything")]);
+    assert!(sessions_view::match_session(&s, &[]).is_some());
+    // Empty terms => no filtering, matches with no preview
+    let result = sessions_view::match_session(&s, &[]).unwrap();
+    assert_eq!(result.match_count, 0);
+    assert!(result.preview.is_none());
+}
+
+#[test]
+fn match_session_finds_substring_case_insensitive() {
+    let s = session_with_messages(vec![
+        msg(Role::User, "How does the CACHE work here?"),
+        msg(Role::Assistant, "Cache lives in cache.rs"),
+    ]);
+    let result = sessions_view::match_session(&s, &["cache"]).unwrap();
+    assert_eq!(result.match_count, 2);
+    assert!(result.preview.as_ref().unwrap().contains("cache"));
+}
+
+#[test]
+fn match_session_requires_all_terms_and_combined() {
+    let s = session_with_messages(vec![msg(Role::User, "cache invalidation is hard")]);
+    assert!(sessions_view::match_session(&s, &["cache", "invalidation"]).is_some());
+    assert!(sessions_view::match_session(&s, &["cache", "missing"]).is_none());
+}
+
+#[test]
+fn match_session_ignores_system_messages_for_match() {
+    let s = session_with_messages(vec![
+        msg(Role::System, "you can talk about cache"),
+        msg(Role::User, "hello world"),
+    ]);
+    assert!(sessions_view::match_session(&s, &["cache"]).is_none());
+}
+
+#[test]
+fn match_session_preview_caps_length() {
+    let long = "x".repeat(500);
+    let content = format!("prefix {} cache {} suffix", long, long);
+    let s = session_with_messages(vec![msg(Role::User, &content)]);
+    let result = sessions_view::match_session(&s, &["cache"]).unwrap();
+    let preview = result.preview.unwrap();
+    assert!(preview.chars().count() <= 200);
+    assert!(preview.contains("cache"));
+}
