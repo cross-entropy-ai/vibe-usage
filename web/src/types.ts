@@ -3,45 +3,46 @@ export type { Tool };
 export type Role = "user" | "assistant" | "system";
 
 export interface TokenUsage {
-  input?: number;
-  output?: number;
-  thinking?: number;
-  cache_read?: number;
-  cache_write?: number;
+  input?: number | null;
+  output?: number | null;
+  thinking?: number | null;
+  cache_read?: number | null;
+  cache_write?: number | null;
 }
 
 export interface ToolCall {
   name: string;
-  args?: unknown;
-  status?: string;
+  args?: unknown | null;
+  status?: string | null;
 }
 
 export interface Message {
   role: Role;
   content: string;
   timestamp: string;
-  model?: string;
-  tokens?: TokenUsage;
-  duration_ms?: number;
+  model?: string | null;
+  tokens?: TokenUsage | null;
+  duration_ms?: number | null;
   tool_calls: ToolCall[];
 }
 
 export interface GitContext {
-  branch?: string;
-  commit?: string;
-  repo_url?: string;
+  branch?: string | null;
+  commit?: string | null;
+  repo_url?: string | null;
 }
 
 export interface Session {
   id: string;
   tool: Tool;
-  project?: string;
-  model?: string;
+  hostname?: string | null;
+  project?: string | null;
+  model?: string | null;
   start_time: string;
-  end_time?: string;
-  duration_ms?: number;
-  cwd?: string;
-  git?: GitContext;
+  end_time?: string | null;
+  duration_ms?: number | null;
+  cwd?: string | null;
+  git?: GitContext | null;
   messages: Message[];
 }
 
