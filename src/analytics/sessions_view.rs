@@ -72,7 +72,7 @@ pub fn match_session(session: &Session, terms_lower: &[&str]) -> Option<MatchRes
         if first_preview.is_none() {
             let first_term = terms_lower[0];
             if let Some(idx) = content_lower.find(first_term) {
-                first_preview = Some(build_preview(&content_lower, idx, first_term.len()));
+                first_preview = Some(build_preview(&m.content, idx, first_term.len()));
             }
         }
     }

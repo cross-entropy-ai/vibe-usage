@@ -128,7 +128,11 @@ fn match_session_finds_substring_case_insensitive() {
     ]);
     let result = sessions_view::match_session(&s, &["cache"]).unwrap();
     assert_eq!(result.match_count, 2);
-    assert!(result.preview.as_ref().unwrap().contains("cache"));
+    assert!(
+        result.preview.as_ref().unwrap().to_lowercase().contains("cache"),
+        "preview should contain the matched term (case-insensitively): {:?}",
+        result.preview
+    );
 }
 
 #[test]
@@ -156,4 +160,18 @@ fn match_session_preview_caps_length() {
     let preview = result.preview.unwrap();
     assert!(preview.chars().count() <= 200);
     assert!(preview.contains("cache"));
+}
+
+#[test]
+fn match_session_preview_preserves_original_case() {
+    let s = session_with_messages(vec![msg(
+        Role::User,
+        "How does the CACHE invalidation work?",
+    )]);
+    let result = sessions_view::match_session(&s, &["cache"]).unwrap();
+    let preview = result.preview.unwrap();
+    assert!(
+        preview.contains("CACHE"),
+        "preview should keep original case, got: {preview}"
+    );
 }
