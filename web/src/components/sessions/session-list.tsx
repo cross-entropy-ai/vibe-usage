@@ -69,7 +69,7 @@ export function SessionList({
         {!loading && items.length === 0 && (
           <div className="p-3 text-[12px] text-slate-500">No sessions match.</div>
         )}
-        {items.map((item) => {
+        {!loading && items.map((item) => {
           const active = item.id === selectedId;
           return (
             <button

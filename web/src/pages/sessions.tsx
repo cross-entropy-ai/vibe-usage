@@ -38,6 +38,7 @@ export default function SessionsPage() {
   useEffect(() => {
     let cancelled = false;
     setListLoading(true);
+    setItems([]);
     fetchSessionList({ project, tool, q })
       .then((r) => {
         if (!cancelled) setItems(r.sessions);
