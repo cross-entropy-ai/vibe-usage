@@ -24,7 +24,7 @@ function formatJson(value: unknown): string {
 
 export function ToolCallRow({ call, forceOpen }: { call: ToolCall; forceOpen?: boolean }) {
   const [localOpen, setLocalOpen] = useState(false);
-  const open = forceOpen ?? localOpen;
+  const open = forceOpen || localOpen;
   const isError = call.status === "error";
 
   return (
