@@ -80,6 +80,7 @@ struct ApiInfoResponse {
 const ENDPOINTS: &[EndpointInfo] = &[
     EndpointInfo { method: "GET", path: "/api/sessions", description: "Raw sessions with optional filters and pagination" },
     EndpointInfo { method: "GET", path: "/api/sessions/list", description: "Lightweight session summaries with title, message/token totals; supports project/tool/q filters" },
+    EndpointInfo { method: "GET", path: "/api/sessions/projects", description: "Per-project session counts across the full dataset (no pagination)" },
     EndpointInfo { method: "GET", path: "/api/sessions/{id}", description: "Full Session record (all messages) for one session id" },
     EndpointInfo { method: "DELETE", path: "/api/sessions/{id}", description: "Delete a session's raw files across all host directories (irreversible)" },
     EndpointInfo { method: "GET", path: "/api/summary", description: "Top-level totals plus per-day sessions/messages/tokens" },
@@ -154,6 +155,17 @@ async fn api_sessions_list(
         offset: q.offset.unwrap_or(0),
     };
     Json(serde_json::to_value(analytics::build_list(&sessions, &list_q)).unwrap())
+}
+
+async fn api_sessions_projects(
+    State(state): State<Arc<AppState>>,
+) -> Json<serde_json::Value> {
+    let sessions = collect_sessions(&state).await;
+    let counts = analytics::project_counts(&sessions);
+    Json(serde_json::json!({
+        "total": sessions.len(),
+        "projects": counts,
+    }))
 }
 
 async fn api_session_detail(
@@ -588,6 +600,7 @@ pub async fn serve(
     let app = Router::new()
         .route("/api/sessions", get(api_sessions))
         .route("/api/sessions/list", get(api_sessions_list))
+        .route("/api/sessions/projects", get(api_sessions_projects))
         .route("/api/sessions/{id}", get(api_session_detail).delete(api_session_delete))
         .route("/api/summary", get(api_summary))
         .route("/api/tokens/daily", get(api_tokens_daily))

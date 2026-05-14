@@ -61,9 +61,8 @@ pub fn match_session(session: &Session, terms_lower: &[&str]) -> Option<MatchRes
         if !matches!(m.role, Role::User | Role::Assistant) {
             continue;
         }
-        let content_lower = m.content.to_lowercase();
 
-        if !terms_lower.iter().all(|t| content_lower.contains(t)) {
+        if !terms_lower.iter().all(|t| find_ci(&m.content, t).is_some()) {
             continue;
         }
 
@@ -71,8 +70,8 @@ pub fn match_session(session: &Session, terms_lower: &[&str]) -> Option<MatchRes
 
         if first_preview.is_none() {
             let first_term = terms_lower[0];
-            if let Some(idx) = content_lower.find(first_term) {
-                first_preview = Some(build_preview(&m.content, idx, first_term.len()));
+            if let Some((start, end)) = find_ci(&m.content, first_term) {
+                first_preview = Some(build_preview(&m.content, start, end - start));
             }
         }
     }
@@ -84,6 +83,48 @@ pub fn match_session(session: &Session, terms_lower: &[&str]) -> Option<MatchRes
         match_count: total_matches,
         preview: first_preview,
     })
+}
+
+/// Case-insensitive substring search that returns byte offsets in the
+/// ORIGINAL haystack. `needle_lower` must already be lowercased by the
+/// caller. Safe for non-ASCII content where `to_lowercase()` would
+/// change byte lengths (e.g. ß → ss): we lowercase haystack chars
+/// on the fly while walking char boundaries, so the returned range
+/// is always a valid `&str` slice.
+fn find_ci(haystack: &str, needle_lower: &str) -> Option<(usize, usize)> {
+    if needle_lower.is_empty() {
+        return Some((0, 0));
+    }
+    for (start, _) in haystack.char_indices() {
+        // Try to match needle_lower starting at byte position `start`.
+        let mut hay_iter = haystack[start..]
+            .chars()
+            .flat_map(|c| c.to_lowercase());
+        let mut needle_iter = needle_lower.chars();
+        let matched = loop {
+            match (needle_iter.next(), hay_iter.next()) {
+                (None, _) => break true,
+                (Some(_), None) => break false,
+                (Some(nc), Some(hc)) if nc == hc => continue,
+                _ => break false,
+            }
+        };
+        if matched {
+            // Walk haystack chars again to find how many bytes were consumed.
+            let mut needle_remaining: i64 = needle_lower.chars().count() as i64;
+            let mut end = start;
+            for (off, ch) in haystack[start..].char_indices() {
+                if needle_remaining <= 0 {
+                    end = start + off;
+                    break;
+                }
+                needle_remaining -= ch.to_lowercase().count() as i64;
+                end = start + off + ch.len_utf8();
+            }
+            return Some((start, end));
+        }
+    }
+    None
 }
 
 use chrono::{DateTime, Utc};
@@ -256,6 +297,29 @@ fn build_preview(content: &str, byte_idx: usize, match_len: usize) -> String {
 /// `PricingProvider` type. The HTTP layer adapts the real provider into this.
 pub trait PricingLookup {
     fn input_output(&self, model: &str) -> Option<(f64, f64)>;
+}
+
+#[derive(Debug, Serialize)]
+pub struct ProjectCount {
+    pub project: Option<String>,
+    pub count: usize,
+}
+
+/// Build per-project session counts across the full dataset, sorted
+/// descending by count. Sessions with `project: None` collapse into one
+/// entry with `project: None` in the response.
+pub fn project_counts(sessions: &[Session]) -> Vec<ProjectCount> {
+    use std::collections::HashMap;
+    let mut counts: HashMap<Option<String>, usize> = HashMap::new();
+    for s in sessions {
+        *counts.entry(s.project.clone()).or_insert(0) += 1;
+    }
+    let mut rows: Vec<ProjectCount> = counts
+        .into_iter()
+        .map(|(project, count)| ProjectCount { project, count })
+        .collect();
+    rows.sort_by(|a, b| b.count.cmp(&a.count));
+    rows
 }
 
 pub fn estimated_cost_usd(session: &Session, pricing: &dyn PricingLookup) -> f64 {

@@ -176,6 +176,29 @@ fn match_session_preview_preserves_original_case() {
     );
 }
 
+#[test]
+fn match_session_handles_unicode_lowercase_length_change() {
+    // German ß lowercases to itself but uppercase ẞ also exists; more
+    // importantly, the Turkish dotted/dotless İ/I pair changes byte length
+    // when lowercased. We just need any char whose lowercase form has a
+    // different UTF-8 byte length than the original to expose the bug.
+    // Capital İ (U+0130, 2 bytes) lowercases to "i\u{307}" (3 bytes).
+    let s = session_with_messages(vec![msg(
+        Role::User,
+        "İstanbul has CACHE issues — see İSTANBUL logs",
+    )]);
+    // Should not panic; should find "cache".
+    let result = sessions_view::match_session(&s, &["cache"]).unwrap();
+    let preview = result.preview.unwrap();
+    assert!(
+        preview.to_lowercase().contains("cache"),
+        "preview should still contain the matched term, got: {preview}"
+    );
+    // And the preview should be a valid &str slice of the original — meaning
+    // start/end live on char boundaries of the original content.
+    // (If find_ci returned bad byte offsets, build_preview would panic.)
+}
+
 fn make_session(id: &str, project: Option<&str>, user_text: &str) -> Session {
     let mut s = session_with_messages(vec![msg(Role::User, user_text)]);
     s.id = id.to_string();
@@ -320,4 +343,24 @@ fn estimated_cost_zero_when_pricing_missing() {
     }
     let s = session_with_messages(vec![msg_with_tokens(Role::Assistant, 100, 50, None)]);
     assert_eq!(sessions_view::estimated_cost_usd(&s, &NoPricing), 0.0);
+}
+
+#[test]
+fn project_counts_aggregates_and_sorts() {
+    let sessions = vec![
+        make_session("a", Some("alpha"), "x"),
+        make_session("b", Some("alpha"), "x"),
+        make_session("c", Some("alpha"), "x"),
+        make_session("d", Some("beta"), "x"),
+        make_session("e", None, "x"),
+    ];
+    let rows = sessions_view::project_counts(&sessions);
+    assert_eq!(rows.len(), 3);
+    // Sorted by count desc.
+    assert_eq!(rows[0].project.as_deref(), Some("alpha"));
+    assert_eq!(rows[0].count, 3);
+    assert_eq!(rows[1].count, 1);
+    assert_eq!(rows[2].count, 1);
+    // The None entry should be present.
+    assert!(rows.iter().any(|r| r.project.is_none()));
 }
