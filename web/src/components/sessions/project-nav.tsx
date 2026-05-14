@@ -1,28 +1,18 @@
-import { useMemo } from "react";
-import type { SessionListItem } from "@/types/sessions";
+import type { ProjectCount } from "@/lib/sessions-api";
 
 const NO_PROJECT_KEY = "__none__";
 
 export function ProjectNav({
-  items,
+  projects,
+  total,
   selected,
   onSelect,
 }: {
-  items: SessionListItem[];
+  projects: ProjectCount[];
+  total: number;
   selected: string | null;
   onSelect: (project: string | null) => void;
 }) {
-  const groups = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const it of items) {
-      const key = it.project ?? NO_PROJECT_KEY;
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
-  }, [items]);
-
-  const total = items.length;
-
   function Row({ k, label, count }: { k: string | null; label: string; count: number }) {
     const isActive = (selected ?? null) === k;
     return (
@@ -43,14 +33,17 @@ export function ProjectNav({
     <nav className="flex h-full flex-col gap-1 overflow-y-auto p-2">
       <Row k={null} label="All projects" count={total} />
       <div className="my-1 border-t border-slate-200" />
-      {groups.map(([key, count]) => (
-        <Row
-          key={key}
-          k={key}
-          label={key === NO_PROJECT_KEY ? "(no project)" : key}
-          count={count}
-        />
-      ))}
+      {projects.map((p) => {
+        const key = p.project ?? NO_PROJECT_KEY;
+        return (
+          <Row
+            key={key}
+            k={key}
+            label={p.project ?? "(no project)"}
+            count={p.count}
+          />
+        );
+      })}
     </nav>
   );
 }

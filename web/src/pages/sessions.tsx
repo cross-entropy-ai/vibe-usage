@@ -1,14 +1,18 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import type { SessionDetail, SessionListItem } from "@/types/sessions";
 import {
   deleteSession,
+  fetchProjectCounts,
   fetchSessionDetail,
   fetchSessionList,
+  type ProjectCount,
 } from "@/lib/sessions-api";
 import { ProjectNav } from "@/components/sessions/project-nav";
 import { SessionList } from "@/components/sessions/session-list";
 import { SessionDetail as SessionDetailPane } from "@/components/sessions/session-detail";
+
+const QUERY_DEBOUNCE_MS = 200;
 
 export default function SessionsPage() {
   const [params, setParams] = useSearchParams();
@@ -17,9 +21,18 @@ export default function SessionsPage() {
   const q = params.get("q") ?? "";
   const id = params.get("id");
 
+  // Local input state for the search box so typing is responsive even
+  // before the debounced URL update fires.
+  const [qInput, setQInput] = useState(q);
+  useEffect(() => {
+    // Keep input in sync if URL changes externally (back/forward, copy-paste).
+    setQInput(q);
+  }, [q]);
+
   const [items, setItems] = useState<SessionListItem[]>([]);
   const [listLoading, setListLoading] = useState(false);
-  const [allForNav, setAllForNav] = useState<SessionListItem[]>([]);
+  const [navProjects, setNavProjects] = useState<ProjectCount[]>([]);
+  const [navTotal, setNavTotal] = useState(0);
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -38,67 +51,86 @@ export default function SessionsPage() {
     [setParams],
   );
 
-  // List for current filters
+  // Debounce qInput → URL `q` param.
+  const debounceTimer = useRef<number | null>(null);
+  const onQueryChange = useCallback(
+    (v: string) => {
+      setQInput(v);
+      if (debounceTimer.current != null) {
+        window.clearTimeout(debounceTimer.current);
+      }
+      debounceTimer.current = window.setTimeout(() => {
+        update({ q: v });
+      }, QUERY_DEBOUNCE_MS);
+    },
+    [update],
+  );
+  useEffect(
+    () => () => {
+      if (debounceTimer.current != null) window.clearTimeout(debounceTimer.current);
+    },
+    [],
+  );
+
+  // List for current filters (re-fetches when project/tool/q URL params change).
   useEffect(() => {
-    let cancelled = false;
+    const ac = new AbortController();
     setListLoading(true);
     setItems([]);
-    fetchSessionList({ project, tool, q })
+    fetchSessionList({ project, tool, q }, ac.signal)
       .then((r) => {
-        if (!cancelled) setItems(r.sessions);
+        if (!ac.signal.aborted) setItems(r.sessions);
       })
-      .catch(() => {
-        if (!cancelled) setItems([]);
+      .catch((e) => {
+        if (!ac.signal.aborted) {
+          // eslint-disable-next-line no-console
+          console.warn("session list fetch failed", e);
+          setItems([]);
+        }
       })
       .finally(() => {
-        if (!cancelled) setListLoading(false);
+        if (!ac.signal.aborted) setListLoading(false);
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => ac.abort();
   }, [project, tool, q]);
 
-  // Independent fetch for the nav counts (no filters)
-  useEffect(() => {
-    let cancelled = false;
-    fetchSessionList({ limit: 2000 })
-      .then((r) => {
-        if (!cancelled) setAllForNav(r.sessions);
-      })
-      .catch(() => {
-        if (!cancelled) setAllForNav([]);
-      });
-    return () => {
-      cancelled = true;
-    };
+  // Nav counts: one call per mount, no pagination.
+  const refreshNav = useCallback(async () => {
+    try {
+      const r = await fetchProjectCounts();
+      setNavProjects(r.projects);
+      setNavTotal(r.total);
+    } catch {
+      setNavProjects([]);
+      setNavTotal(0);
+    }
   }, []);
+  useEffect(() => {
+    void refreshNav();
+  }, [refreshNav]);
 
   const handleDelete = useCallback(
     async (sid: string) => {
       try {
         await deleteSession(sid);
-        // Clear detail + URL id
         setDetail(null);
         setDetailError(null);
         update({ id: null });
-        // Refetch both lists so counts and rows reflect the deletion
-        const [filtered, all] = await Promise.all([
-          fetchSessionList({ project, tool, q }),
-          fetchSessionList({ limit: 2000 }),
-        ]);
+        const filtered = await fetchSessionList({ project, tool, q });
         setItems(filtered.sessions);
-        setAllForNav(all.sessions);
+        await refreshNav();
       } catch (e) {
-        // eslint-disable-next-line no-alert
-        window.alert(`Could not delete session: ${e instanceof Error ? e.message : String(e)}`);
+        window.alert(
+          `Could not delete session: ${e instanceof Error ? e.message : String(e)}`,
+        );
       }
     },
-    [project, tool, q, update],
+    [project, tool, q, update, refreshNav],
   );
 
   // Detail
   useEffect(() => {
-    let cancelled = false;
+    const ac = new AbortController();
     if (!id) {
       setDetail(null);
       setDetailError(null);
@@ -106,27 +138,24 @@ export default function SessionsPage() {
     }
     setDetailLoading(true);
     setDetailError(null);
-    fetchSessionDetail(id)
+    fetchSessionDetail(id, ac.signal)
       .then((d) => {
-        if (cancelled) return;
+        if (ac.signal.aborted) return;
         if (d == null) {
           setDetail(null);
           setDetailError("Session not found");
-          // clear stale id
           update({ id: null });
         } else {
           setDetail(d);
         }
       })
       .catch((e) => {
-        if (!cancelled) setDetailError(String(e));
+        if (!ac.signal.aborted) setDetailError(String(e));
       })
       .finally(() => {
-        if (!cancelled) setDetailLoading(false);
+        if (!ac.signal.aborted) setDetailLoading(false);
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => ac.abort();
   }, [id, update]);
 
   return (
@@ -140,7 +169,8 @@ export default function SessionsPage() {
       <div className="flex flex-1 overflow-hidden">
         <aside className="w-[220px] flex-none border-r border-slate-200 bg-white">
           <ProjectNav
-            items={allForNav}
+            projects={navProjects}
+            total={navTotal}
             selected={project}
             onSelect={(p) => update({ project: p, id: null })}
           />
@@ -149,10 +179,10 @@ export default function SessionsPage() {
           <SessionList
             items={items}
             selectedId={id}
-            q={q}
+            q={qInput}
             tool={tool}
             loading={listLoading}
-            onQuery={(v) => update({ q: v })}
+            onQuery={onQueryChange}
             onTool={(v) => update({ tool: v })}
             onSelect={(sid) => update({ id: sid })}
           />

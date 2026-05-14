@@ -33,6 +33,9 @@ export function ToolCallRow({ call, forceOpen }: { call: ToolCall; forceOpen?: b
         type="button"
         disabled={!!forceOpen}
         onClick={() => {
+          // When the global toggle is forcing this open, ignore clicks so we
+          // don't desync localOpen — otherwise turning the toggle off later
+          // leaves some rows surprisingly open/closed based on stale clicks.
           if (forceOpen) return;
           setLocalOpen((v) => !v);
         }}

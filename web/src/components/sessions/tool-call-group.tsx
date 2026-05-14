@@ -21,12 +21,14 @@ export function ToolCallGroup({
     <div>
       <button
         type="button"
+        disabled={forceOpen}
         onClick={() => {
-          if (!forceOpen) {
-            setLocalOpen((v) => !v);
-          }
+          // Same as ToolCallRow: don't desync localOpen while the global
+          // "Show tool details" toggle is forcing the group open.
+          if (forceOpen) return;
+          setLocalOpen((v) => !v);
         }}
-        className="flex w-full items-center gap-1.5 rounded border border-slate-200 bg-white px-2 py-1 text-left text-[12px] font-medium text-slate-600 hover:bg-slate-50"
+        className="flex w-full items-center gap-1.5 rounded border border-slate-200 bg-white px-2 py-1 text-left text-[12px] font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-default"
       >
         <ChevronRight
           className={`size-3 transition-transform ${open ? "rotate-90" : ""}`}
@@ -43,7 +45,7 @@ export function ToolCallGroup({
       {open && (
         <div className="mt-1 space-y-1 pl-3">
           {calls.map((call, i) => (
-            <ToolCallRow key={i} call={call} forceOpen={forceOpen} />
+            <ToolCallRow key={`${call.name}-${i}`} call={call} forceOpen={forceOpen} />
           ))}
         </div>
       )}
