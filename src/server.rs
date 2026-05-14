@@ -80,8 +80,8 @@ struct ApiInfoResponse {
 const ENDPOINTS: &[EndpointInfo] = &[
     EndpointInfo { method: "GET", path: "/api/sessions", description: "Raw sessions with optional filters and pagination" },
     EndpointInfo { method: "GET", path: "/api/sessions/list", description: "Lightweight session summaries with title, message/token totals; supports project/tool/q filters" },
-    EndpointInfo { method: "GET", path: "/api/sessions/:id", description: "Full Session record (all messages) for one session id" },
-    EndpointInfo { method: "DELETE", path: "/api/sessions/:id", description: "Delete a session's raw files across all host directories (irreversible)" },
+    EndpointInfo { method: "GET", path: "/api/sessions/{id}", description: "Full Session record (all messages) for one session id" },
+    EndpointInfo { method: "DELETE", path: "/api/sessions/{id}", description: "Delete a session's raw files across all host directories (irreversible)" },
     EndpointInfo { method: "GET", path: "/api/summary", description: "Top-level totals plus per-day sessions/messages/tokens" },
     EndpointInfo { method: "GET", path: "/api/tokens/daily", description: "Daily token totals split by tool" },
     EndpointInfo { method: "GET", path: "/api/tokens/by-model", description: "Per-model output/thinking token totals" },
