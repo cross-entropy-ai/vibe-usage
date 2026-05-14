@@ -31,8 +31,12 @@ export function ToolCallRow({ call, forceOpen }: { call: ToolCall; forceOpen?: b
     <div className="rounded border border-slate-200 bg-white text-[12px]">
       <button
         type="button"
-        onClick={() => setLocalOpen((v) => !v)}
-        className="flex w-full items-center gap-1.5 px-2 py-1 text-left font-mono"
+        disabled={!!forceOpen}
+        onClick={() => {
+          if (forceOpen) return;
+          setLocalOpen((v) => !v);
+        }}
+        className="flex w-full items-center gap-1.5 px-2 py-1 text-left font-mono disabled:cursor-default"
       >
         <ChevronRight
           className={`size-3 transition-transform ${open ? "rotate-90" : ""}`}
