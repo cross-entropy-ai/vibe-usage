@@ -15,10 +15,6 @@ export function ToolCallGroup({
 
   if (calls.length === 0) return null;
 
-  if (calls.length === 1) {
-    return <ToolCallRow call={calls[0]} forceOpen={forceOpen} />;
-  }
-
   const errorCount = calls.filter((c) => c.status === "error").length;
 
   return (
@@ -32,7 +28,7 @@ export function ToolCallGroup({
           className={`size-3 transition-transform ${open ? "rotate-90" : ""}`}
         />
         <span>
-          {calls.length} tool calls
+          {calls.length} tool call{calls.length === 1 ? "" : "s"}
         </span>
         {errorCount > 0 && (
           <span className="ml-1 text-rose-600">

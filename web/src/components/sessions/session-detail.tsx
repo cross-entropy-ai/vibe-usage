@@ -8,47 +8,82 @@ import { MessageBubble } from "./message-bubble";
 import { ToolCallGroup } from "./tool-call-group";
 
 type RenderUnit =
-  | { kind: "message"; msg: SessionMessage; key: string }
-  | { kind: "tool-run"; calls: ToolCall[]; key: string };
+  | {
+      kind: "message";
+      msg: SessionMessage;
+      callsBefore: ToolCall[];
+      callsAfter: ToolCall[];
+      key: string;
+    }
+  | { kind: "tool-orphans"; calls: ToolCall[]; key: string };
 
-function isToolOnlyAssistant(m: SessionMessage): boolean {
-  return (
-    m.role === "assistant" &&
-    m.tool_calls.length > 0 &&
-    !m.content.trim()
-  );
-}
-
+/**
+ * Group rule: only CONSECUTIVE tool-only assistant messages accumulate
+ * into a run. When the run ends:
+ *   - if the next message is a text-bearing assistant, attach the run
+ *     to its card (so the card shows text + a collapsible "N tool calls")
+ *   - otherwise (user / system / session end), the run becomes its own
+ *     standalone card and the breaking message renders normally
+ * Any non-tool-only message ends the run.
+ */
 function buildUnits(messages: SessionMessage[], sessionId: string): RenderUnit[] {
   const units: RenderUnit[] = [];
-  let runStart = -1;
   let runCalls: ToolCall[] = [];
+  let runStart = -1;
 
-  const flushRun = () => {
-    if (runStart < 0) return;
+  const flushOrphan = () => {
+    if (runCalls.length === 0) return;
     units.push({
-      kind: "tool-run",
+      kind: "tool-orphans",
       calls: runCalls,
-      key: `${sessionId}-run-${runStart}`,
+      key: `${sessionId}-orphans-${runStart}`,
     });
-    runStart = -1;
     runCalls = [];
+    runStart = -1;
   };
 
   for (let i = 0; i < messages.length; i++) {
     const m = messages[i];
-    if (isToolOnlyAssistant(m)) {
-      if (runStart < 0) {
-        runStart = i;
-        runCalls = [];
-      }
+    const hasText = !!m.content.trim();
+    const hasTools = m.tool_calls.length > 0;
+    const isToolOnlyAsst = m.role === "assistant" && hasTools && !hasText;
+
+    if (isToolOnlyAsst) {
+      if (runStart < 0) runStart = i;
       runCalls.push(...m.tool_calls);
-    } else {
-      flushRun();
-      units.push({ kind: "message", msg: m, key: `${sessionId}-msg-${i}` });
+      continue;
     }
+
+    if (m.role === "assistant" && hasText) {
+      units.push({
+        kind: "message",
+        msg: m,
+        callsBefore: runCalls,
+        callsAfter: m.tool_calls,
+        key: `${sessionId}-msg-${i}`,
+      });
+      runCalls = [];
+      runStart = -1;
+      continue;
+    }
+
+    if (m.role === "assistant" && !hasText && !hasTools) {
+      // empty assistant — skip (rare/never in real data)
+      continue;
+    }
+
+    // user / system message: end the run as an orphan, then render
+    flushOrphan();
+    units.push({
+      kind: "message",
+      msg: m,
+      callsBefore: [],
+      callsAfter: [],
+      key: `${sessionId}-msg-${i}`,
+    });
   }
-  flushRun();
+
+  flushOrphan();
   return units;
 }
 
@@ -160,6 +195,8 @@ export function SessionDetail({
               <MessageBubble
                 key={unit.key}
                 message={unit.msg}
+                callsBefore={unit.callsBefore}
+                callsAfter={unit.callsAfter}
                 forceToolDetails={showToolDetails}
               />
             ) : (
