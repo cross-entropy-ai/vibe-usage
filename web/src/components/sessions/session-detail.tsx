@@ -104,10 +104,12 @@ export function SessionDetail({
   detail,
   loading,
   error,
+  onDelete,
 }: {
   detail: SessionDetailType | null;
   loading: boolean;
   error: string | null;
+  onDelete?: (id: string) => Promise<void> | void;
 }) {
   const [renderCount, setRenderCount] = useState(INITIAL_RENDER);
   const [showToolDetails, setShowToolDetails] = useState(false);
@@ -185,6 +187,23 @@ export function SessionDetail({
             />
             Show tool details
           </label>
+          {onDelete && (
+            <button
+              type="button"
+              onClick={() => {
+                const ok = window.confirm(
+                  "Delete this session and all its local files? This is irreversible. " +
+                    "If you have remote rsync sync enabled, the next pull may bring back any " +
+                    "copies still on remote hosts.",
+                );
+                if (!ok) return;
+                void onDelete(detail.id);
+              }}
+              className="ml-auto rounded border border-rose-300 px-2 py-0.5 text-[11px] text-rose-600 hover:bg-rose-50"
+            >
+              Delete
+            </button>
+          )}
         </div>
       </div>
 

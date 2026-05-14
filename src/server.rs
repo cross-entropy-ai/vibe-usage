@@ -81,6 +81,7 @@ const ENDPOINTS: &[EndpointInfo] = &[
     EndpointInfo { method: "GET", path: "/api/sessions", description: "Raw sessions with optional filters and pagination" },
     EndpointInfo { method: "GET", path: "/api/sessions/list", description: "Lightweight session summaries with title, message/token totals; supports project/tool/q filters" },
     EndpointInfo { method: "GET", path: "/api/sessions/:id", description: "Full Session record (all messages) for one session id" },
+    EndpointInfo { method: "DELETE", path: "/api/sessions/:id", description: "Delete a session's raw files across all host directories (irreversible)" },
     EndpointInfo { method: "GET", path: "/api/summary", description: "Top-level totals plus per-day sessions/messages/tokens" },
     EndpointInfo { method: "GET", path: "/api/tokens/daily", description: "Daily token totals split by tool" },
     EndpointInfo { method: "GET", path: "/api/tokens/by-model", description: "Per-model output/thinking token totals" },
@@ -173,6 +174,89 @@ async fn api_session_detail(
         )
             .into_response(),
     }
+}
+
+fn is_safe_session_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 128
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+fn delete_session_files(raw_root: &std::path::Path, id: &str) -> (Vec<String>, Vec<String>) {
+    let mut deleted = Vec::new();
+    let mut errors = Vec::new();
+    walk_for_session(raw_root, id, &mut deleted, &mut errors);
+    (deleted, errors)
+}
+
+fn walk_for_session(
+    dir: &std::path::Path,
+    id: &str,
+    deleted: &mut Vec<String>,
+    errors: &mut Vec<String>,
+) {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let ftype = match entry.file_type() {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+        if ftype.is_dir() {
+            walk_for_session(&path, id, deleted, errors);
+        } else if ftype.is_file() {
+            if path.file_stem().and_then(|s| s.to_str()) == Some(id) {
+                match std::fs::remove_file(&path) {
+                    Ok(_) => deleted.push(path.to_string_lossy().to_string()),
+                    Err(e) => errors.push(format!("{}: {}", path.display(), e)),
+                }
+            }
+        }
+    }
+}
+
+async fn api_session_delete(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Response {
+    if !is_safe_session_id(&id) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "invalid session id"})),
+        )
+            .into_response();
+    }
+
+    let raw_root = state.data_dir.join("raw");
+    let (deleted, errors) = delete_session_files(&raw_root, &id);
+
+    if deleted.is_empty() && errors.is_empty() {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "session not found"})),
+        )
+            .into_response();
+    }
+
+    state.invalidate_cache();
+
+    if !errors.is_empty() {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "deleted": deleted,
+                "errors": errors,
+            })),
+        )
+            .into_response();
+    }
+
+    Json(serde_json::json!({"deleted": deleted})).into_response()
 }
 
 async fn api_summary(
@@ -504,7 +588,7 @@ pub async fn serve(
     let app = Router::new()
         .route("/api/sessions", get(api_sessions))
         .route("/api/sessions/list", get(api_sessions_list))
-        .route("/api/sessions/{id}", get(api_session_detail))
+        .route("/api/sessions/{id}", get(api_session_detail).delete(api_session_delete))
         .route("/api/summary", get(api_summary))
         .route("/api/tokens/daily", get(api_tokens_daily))
         .route("/api/tokens/by-model", get(api_tokens_by_model))

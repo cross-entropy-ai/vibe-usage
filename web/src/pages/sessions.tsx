@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import type { SessionDetail, SessionListItem } from "@/types/sessions";
-import { fetchSessionDetail, fetchSessionList } from "@/lib/sessions-api";
+import {
+  deleteSession,
+  fetchSessionDetail,
+  fetchSessionList,
+} from "@/lib/sessions-api";
 import { ProjectNav } from "@/components/sessions/project-nav";
 import { SessionList } from "@/components/sessions/session-list";
 import { SessionDetail as SessionDetailPane } from "@/components/sessions/session-detail";
@@ -69,6 +73,29 @@ export default function SessionsPage() {
     };
   }, []);
 
+  const handleDelete = useCallback(
+    async (sid: string) => {
+      try {
+        await deleteSession(sid);
+        // Clear detail + URL id
+        setDetail(null);
+        setDetailError(null);
+        update({ id: null });
+        // Refetch both lists so counts and rows reflect the deletion
+        const [filtered, all] = await Promise.all([
+          fetchSessionList({ project, tool, q }),
+          fetchSessionList({ limit: 2000 }),
+        ]);
+        setItems(filtered.sessions);
+        setAllForNav(all.sessions);
+      } catch (e) {
+        // eslint-disable-next-line no-alert
+        window.alert(`Could not delete session: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    },
+    [project, tool, q, update],
+  );
+
   // Detail
   useEffect(() => {
     let cancelled = false;
@@ -135,6 +162,7 @@ export default function SessionsPage() {
             detail={detail}
             loading={detailLoading}
             error={detailError}
+            onDelete={handleDelete}
           />
         </main>
       </div>

@@ -26,3 +26,20 @@ export async function fetchSessionDetail(id: string): Promise<SessionDetail | nu
   if (!res.ok) throw new Error(`session detail failed: ${res.status}`);
   return res.json();
 }
+
+export async function deleteSession(id: string): Promise<{ deleted: string[] }> {
+  const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const body = (await res.json()) as { error?: string };
+      detail = body?.error ? `: ${body.error}` : "";
+    } catch {
+      // body is not JSON; ignore
+    }
+    throw new Error(`delete session failed (${res.status})${detail}`);
+  }
+  return res.json();
+}

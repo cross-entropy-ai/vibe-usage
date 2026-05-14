@@ -61,6 +61,13 @@ impl AppState {
             _watcher: watcher.ok(),
         }
     }
+
+    /// Force the next read to re-parse from disk. Useful after the server
+    /// mutates the raw/ tree (e.g., session deletion) and can't rely on
+    /// the fs watcher to fire promptly.
+    pub fn invalidate_cache(&self) {
+        self.dirty.store(true, Ordering::Release);
+    }
 }
 
 fn parse_sessions(state: &AppState) -> Vec<Session> {
