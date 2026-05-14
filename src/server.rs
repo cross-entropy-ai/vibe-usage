@@ -26,6 +26,17 @@ struct BashHistoryQuery {
     offset: Option<usize>,
 }
 
+#[derive(Deserialize, Default)]
+struct SessionsListQuery {
+    project: Option<String>,
+    tool: Option<String>,
+    q: Option<String>,
+    from: Option<String>,
+    to: Option<String>,
+    limit: Option<usize>,
+    offset: Option<usize>,
+}
+
 #[derive(serde::Serialize)]
 struct HostToolStat {
     tool: String,
@@ -68,6 +79,10 @@ struct ApiInfoResponse {
 
 const ENDPOINTS: &[EndpointInfo] = &[
     EndpointInfo { method: "GET", path: "/api/sessions", description: "Raw sessions with optional filters and pagination" },
+    EndpointInfo { method: "GET", path: "/api/sessions/list", description: "Lightweight session summaries with title, message/token totals; supports project/tool/q filters" },
+    EndpointInfo { method: "GET", path: "/api/sessions/projects", description: "Per-project session counts across the full dataset (no pagination)" },
+    EndpointInfo { method: "GET", path: "/api/sessions/{id}", description: "Full Session record (all messages) for one session id" },
+    EndpointInfo { method: "DELETE", path: "/api/sessions/{id}", description: "Delete a session's raw files across all host directories (irreversible)" },
     EndpointInfo { method: "GET", path: "/api/summary", description: "Top-level totals plus per-day sessions/messages/tokens" },
     EndpointInfo { method: "GET", path: "/api/tokens/daily", description: "Daily token totals split by tool" },
     EndpointInfo { method: "GET", path: "/api/tokens/by-model", description: "Per-model output/thinking token totals" },
@@ -112,6 +127,148 @@ async fn api_sessions(
         "count": sessions.len(),
         "sessions": sessions,
     }))
+}
+
+struct PricingAdapter<'a>(&'a dyn crate::pricing::PricingProvider);
+
+impl<'a> analytics::PricingLookup for PricingAdapter<'a> {
+    fn input_output(&self, model: &str) -> Option<(f64, f64)> {
+        self.0
+            .price_for(model)
+            .map(|p| (p.input_cost_per_token, p.output_cost_per_token))
+    }
+}
+
+async fn api_sessions_list(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<SessionsListQuery>,
+) -> Json<serde_json::Value> {
+    let sessions = filter_by_date(
+        &collect_sessions(&state).await,
+        &DateRange { from: q.from.clone(), to: q.to.clone() },
+    );
+    let list_q = analytics::ListQuery {
+        project: q.project.clone(),
+        tool: q.tool.clone(),
+        q: q.q.clone(),
+        limit: q.limit.unwrap_or(200),
+        offset: q.offset.unwrap_or(0),
+    };
+    Json(serde_json::to_value(analytics::build_list(&sessions, &list_q)).unwrap())
+}
+
+async fn api_sessions_projects(
+    State(state): State<Arc<AppState>>,
+) -> Json<serde_json::Value> {
+    let sessions = collect_sessions(&state).await;
+    let counts = analytics::project_counts(&sessions);
+    Json(serde_json::json!({
+        "total": sessions.len(),
+        "projects": counts,
+    }))
+}
+
+async fn api_session_detail(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Response {
+    let sessions = collect_sessions(&state).await;
+    match sessions.iter().find(|s| s.id == id) {
+        Some(s) => {
+            let cost = analytics::estimated_cost_usd(s, &PricingAdapter(state.pricing.as_ref()));
+            let mut v = serde_json::to_value(s).unwrap();
+            v["estimated_cost_usd"] = serde_json::json!(cost);
+            Json(v).into_response()
+        }
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "not found"})),
+        )
+            .into_response(),
+    }
+}
+
+fn is_safe_session_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 128
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+fn delete_session_files(raw_root: &std::path::Path, id: &str) -> (Vec<String>, Vec<String>) {
+    let mut deleted = Vec::new();
+    let mut errors = Vec::new();
+    walk_for_session(raw_root, id, &mut deleted, &mut errors);
+    (deleted, errors)
+}
+
+fn walk_for_session(
+    dir: &std::path::Path,
+    id: &str,
+    deleted: &mut Vec<String>,
+    errors: &mut Vec<String>,
+) {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let ftype = match entry.file_type() {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+        if ftype.is_dir() {
+            walk_for_session(&path, id, deleted, errors);
+        } else if ftype.is_file() {
+            if path.file_stem().and_then(|s| s.to_str()) == Some(id) {
+                match std::fs::remove_file(&path) {
+                    Ok(_) => deleted.push(path.to_string_lossy().to_string()),
+                    Err(e) => errors.push(format!("{}: {}", path.display(), e)),
+                }
+            }
+        }
+    }
+}
+
+async fn api_session_delete(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Response {
+    if !is_safe_session_id(&id) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "invalid session id"})),
+        )
+            .into_response();
+    }
+
+    let raw_root = state.data_dir.join("raw");
+    let (deleted, errors) = delete_session_files(&raw_root, &id);
+
+    if deleted.is_empty() && errors.is_empty() {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "session not found"})),
+        )
+            .into_response();
+    }
+
+    state.invalidate_cache();
+
+    if !errors.is_empty() {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "deleted": deleted,
+                "errors": errors,
+            })),
+        )
+            .into_response();
+    }
+
+    Json(serde_json::json!({"deleted": deleted})).into_response()
 }
 
 async fn api_summary(
@@ -442,6 +599,9 @@ pub async fn serve(
 
     let app = Router::new()
         .route("/api/sessions", get(api_sessions))
+        .route("/api/sessions/list", get(api_sessions_list))
+        .route("/api/sessions/projects", get(api_sessions_projects))
+        .route("/api/sessions/{id}", get(api_session_detail).delete(api_session_delete))
         .route("/api/summary", get(api_summary))
         .route("/api/tokens/daily", get(api_tokens_daily))
         .route("/api/tokens/by-model", get(api_tokens_by_model))

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -60,6 +61,13 @@ impl AppState {
             _watcher: watcher.ok(),
         }
     }
+
+    /// Force the next read to re-parse from disk. Useful after the server
+    /// mutates the raw/ tree (e.g., session deletion) and can't rely on
+    /// the fs watcher to fire promptly.
+    pub fn invalidate_cache(&self) {
+        self.dirty.store(true, Ordering::Release);
+    }
 }
 
 fn parse_sessions(state: &AppState) -> Vec<Session> {
@@ -89,8 +97,34 @@ fn parse_sessions(state: &AppState) -> Vec<Session> {
             all.extend(sessions);
         }
     }
-    all.sort_by_key(|s| s.start_time);
-    all
+    let mut deduped = dedupe_by_id(all);
+    deduped.sort_by_key(|s| s.start_time);
+    deduped
+}
+
+/// Multi-host sync (rsync push/pull) replicates the same session jsonl file
+/// across host directories, so the same session id can be loaded multiple
+/// times. Keep one copy per id, preferring the most complete one
+/// (most messages, then latest end_time).
+fn dedupe_by_id(sessions: Vec<Session>) -> Vec<Session> {
+    let mut by_id: HashMap<String, Session> = HashMap::new();
+    for s in sessions {
+        match by_id.get(&s.id) {
+            None => {
+                by_id.insert(s.id.clone(), s);
+            }
+            Some(existing) => {
+                let new_msgs = s.messages.len();
+                let cur_msgs = existing.messages.len();
+                let prefer_new = new_msgs > cur_msgs
+                    || (new_msgs == cur_msgs && s.end_time > existing.end_time);
+                if prefer_new {
+                    by_id.insert(s.id.clone(), s);
+                }
+            }
+        }
+    }
+    by_id.into_values().collect()
 }
 
 pub async fn collect_sessions(state: &AppState) -> Arc<Vec<Session>> {
@@ -201,4 +235,87 @@ pub fn paginate(sessions: Vec<Session>, q: &SessionFilter) -> Vec<Session> {
     let offset = q.offset.unwrap_or(0);
     let limit = q.limit.unwrap_or(sessions.len());
     sessions.into_iter().skip(offset).take(limit).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::schema::{Message, Role, Tool};
+    use chrono::{DateTime, Duration, Utc};
+
+    fn ts(offset_hours: i64) -> DateTime<Utc> {
+        let base = DateTime::parse_from_rfc3339("2026-05-13T10:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        base + Duration::hours(offset_hours)
+    }
+
+    fn msg() -> Message {
+        Message {
+            role: Role::User,
+            content: String::new(),
+            timestamp: ts(0),
+            model: None,
+            tokens: None,
+            duration_ms: None,
+            tool_calls: vec![],
+        }
+    }
+
+    fn session(id: &str, host: &str, msgs: usize, end_offset: i64) -> Session {
+        Session {
+            id: id.to_string(),
+            tool: Tool::Claude,
+            hostname: Some(host.to_string()),
+            project: None,
+            model: None,
+            start_time: ts(0),
+            end_time: Some(ts(end_offset)),
+            duration_ms: None,
+            cwd: None,
+            git: None,
+            messages: vec![msg(); msgs],
+        }
+    }
+
+    #[test]
+    fn dedupe_keeps_one_per_id() {
+        let result = dedupe_by_id(vec![
+            session("a", "host1", 5, 1),
+            session("a", "host2", 5, 1),
+            session("b", "host1", 3, 1),
+        ]);
+        let ids: std::collections::HashSet<_> = result.iter().map(|s| s.id.clone()).collect();
+        assert_eq!(ids.len(), 2);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn dedupe_prefers_more_complete_copy() {
+        let result = dedupe_by_id(vec![
+            session("a", "host1", 3, 1),
+            session("a", "host2", 10, 1), // most complete
+            session("a", "host3", 5, 1),
+        ]);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].messages.len(), 10);
+        assert_eq!(result[0].hostname.as_deref(), Some("host2"));
+    }
+
+    #[test]
+    fn dedupe_tiebreaks_by_latest_end_time() {
+        let result = dedupe_by_id(vec![
+            session("a", "earlier", 5, 1),
+            session("a", "later", 5, 5),
+            session("a", "earliest", 5, 0),
+        ]);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].hostname.as_deref(), Some("later"));
+    }
+
+    #[test]
+    fn dedupe_keeps_empty_input_empty() {
+        let result = dedupe_by_id(vec![]);
+        assert!(result.is_empty());
+    }
 }

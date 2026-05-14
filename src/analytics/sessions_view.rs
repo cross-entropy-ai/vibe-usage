@@ -1,0 +1,343 @@
+use crate::schema::{Role, Session};
+
+const TITLE_MAX_LEN: usize = 80;
+const TITLE_FALLBACK: &str = "(no prompt)";
+
+pub fn extract_title(session: &Session) -> String {
+    let raw = session
+        .messages
+        .iter()
+        .find(|m| matches!(m.role, Role::User) && !m.content.trim().is_empty())
+        .map(|m| m.content.as_str());
+
+    match raw {
+        Some(text) => truncate_title(&collapse_whitespace(text)),
+        None => TITLE_FALLBACK.to_string(),
+    }
+}
+
+fn collapse_whitespace(s: &str) -> String {
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn truncate_title(s: &str) -> String {
+    if s.chars().count() <= TITLE_MAX_LEN {
+        s.to_string()
+    } else {
+        let mut out: String = s.chars().take(TITLE_MAX_LEN).collect();
+        out.push('…');
+        out
+    }
+}
+
+pub fn token_total(session: &Session) -> u64 {
+    session
+        .messages
+        .iter()
+        .filter_map(|m| m.tokens.as_ref())
+        .map(|t| {
+            t.input.unwrap_or(0) + t.output.unwrap_or(0) + t.thinking.unwrap_or(0)
+        })
+        .sum()
+}
+
+const PREVIEW_MAX_LEN: usize = 200;
+const PREVIEW_WINDOW: usize = 80;
+
+pub struct MatchResult {
+    pub match_count: usize,
+    pub preview: Option<String>,
+}
+
+pub fn match_session(session: &Session, terms_lower: &[&str]) -> Option<MatchResult> {
+    if terms_lower.is_empty() {
+        return Some(MatchResult { match_count: 0, preview: None });
+    }
+
+    let mut total_matches = 0usize;
+    let mut first_preview: Option<String> = None;
+
+    for m in &session.messages {
+        if !matches!(m.role, Role::User | Role::Assistant) {
+            continue;
+        }
+
+        if !terms_lower.iter().all(|t| find_ci(&m.content, t).is_some()) {
+            continue;
+        }
+
+        total_matches += 1;
+
+        if first_preview.is_none() {
+            let first_term = terms_lower[0];
+            if let Some((start, end)) = find_ci(&m.content, first_term) {
+                first_preview = Some(build_preview(&m.content, start, end - start));
+            }
+        }
+    }
+
+    if total_matches == 0 {
+        return None;
+    }
+    Some(MatchResult {
+        match_count: total_matches,
+        preview: first_preview,
+    })
+}
+
+/// Case-insensitive substring search that returns byte offsets in the
+/// ORIGINAL haystack. `needle_lower` must already be lowercased by the
+/// caller. Safe for non-ASCII content where `to_lowercase()` would
+/// change byte lengths (e.g. ß → ss): we lowercase haystack chars
+/// on the fly while walking char boundaries, so the returned range
+/// is always a valid `&str` slice.
+fn find_ci(haystack: &str, needle_lower: &str) -> Option<(usize, usize)> {
+    if needle_lower.is_empty() {
+        return Some((0, 0));
+    }
+    for (start, _) in haystack.char_indices() {
+        // Try to match needle_lower starting at byte position `start`.
+        let mut hay_iter = haystack[start..]
+            .chars()
+            .flat_map(|c| c.to_lowercase());
+        let mut needle_iter = needle_lower.chars();
+        let matched = loop {
+            match (needle_iter.next(), hay_iter.next()) {
+                (None, _) => break true,
+                (Some(_), None) => break false,
+                (Some(nc), Some(hc)) if nc == hc => continue,
+                _ => break false,
+            }
+        };
+        if matched {
+            // Walk haystack chars again to find how many bytes were consumed.
+            let mut needle_remaining: i64 = needle_lower.chars().count() as i64;
+            let mut end = start;
+            for (off, ch) in haystack[start..].char_indices() {
+                if needle_remaining <= 0 {
+                    end = start + off;
+                    break;
+                }
+                needle_remaining -= ch.to_lowercase().count() as i64;
+                end = start + off + ch.len_utf8();
+            }
+            return Some((start, end));
+        }
+    }
+    None
+}
+
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+
+const NO_PROJECT_KEY: &str = "__none__";
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ListQuery {
+    pub project: Option<String>,
+    pub tool: Option<String>,
+    pub q: Option<String>,
+    #[serde(default = "default_limit")]
+    pub limit: usize,
+    #[serde(default)]
+    pub offset: usize,
+}
+
+fn default_limit() -> usize {
+    200
+}
+
+impl Default for ListQuery {
+    fn default() -> Self {
+        Self {
+            project: None,
+            tool: None,
+            q: None,
+            limit: default_limit(),
+            offset: 0,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct SessionListItem {
+    pub id: String,
+    pub tool: String,
+    pub project: Option<String>,
+    pub model: Option<String>,
+    pub start_time: DateTime<Utc>,
+    pub message_count: usize,
+    pub token_total: u64,
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub match_preview: Option<String>,
+    pub match_count: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SessionListResponse {
+    pub total: usize,
+    pub offset: usize,
+    pub count: usize,
+    pub sessions: Vec<SessionListItem>,
+}
+
+pub fn build_list(sessions: &[Session], q: &ListQuery) -> SessionListResponse {
+    let terms_lower: Vec<String> = q
+        .q
+        .as_deref()
+        .map(|s| {
+            s.split_whitespace()
+                .map(|t| t.to_lowercase())
+                .collect()
+        })
+        .unwrap_or_default();
+    let terms_ref: Vec<&str> = terms_lower.iter().map(|s| s.as_str()).collect();
+
+    let mut filtered: Vec<(SessionListItem, DateTime<Utc>)> = Vec::new();
+
+    for s in sessions {
+        if let Some(proj) = &q.project {
+            let matches_proj = match s.project.as_deref() {
+                Some(p) => proj == p,
+                None => proj == NO_PROJECT_KEY,
+            };
+            if !matches_proj {
+                continue;
+            }
+        }
+        if let Some(tool) = &q.tool {
+            if s.tool.to_string() != *tool {
+                continue;
+            }
+        }
+
+        let match_result = if terms_ref.is_empty() {
+            None
+        } else {
+            match match_session(s, &terms_ref) {
+                Some(m) => Some(m),
+                None => continue, // search active but no hit -> drop
+            }
+        };
+
+        let (match_preview, match_count) = match match_result {
+            Some(m) => (m.preview, m.match_count),
+            None => (None, 0),
+        };
+
+        let item = SessionListItem {
+            id: s.id.clone(),
+            tool: s.tool.to_string(),
+            project: s.project.clone(),
+            model: s.model.clone(),
+            start_time: s.start_time,
+            message_count: s.messages.len(),
+            token_total: token_total(s),
+            title: extract_title(s),
+            match_preview,
+            match_count,
+        };
+        filtered.push((item, s.start_time));
+    }
+
+    // Newest first
+    filtered.sort_by(|a, b| b.1.cmp(&a.1));
+
+    let total = filtered.len();
+    let offset = q.offset.min(total);
+    let limit = q.limit.min(2000);
+    let page: Vec<SessionListItem> = filtered
+        .into_iter()
+        .skip(offset)
+        .take(limit)
+        .map(|(item, _)| item)
+        .collect();
+
+    SessionListResponse {
+        total,
+        offset,
+        count: page.len(),
+        sessions: page,
+    }
+}
+
+fn build_preview(content: &str, byte_idx: usize, match_len: usize) -> String {
+    let start = content[..byte_idx]
+        .char_indices()
+        .rev()
+        .nth(PREVIEW_WINDOW)
+        .map(|(i, _)| i)
+        .unwrap_or(0);
+    let end_byte = byte_idx + match_len;
+    let end = content[end_byte..]
+        .char_indices()
+        .nth(PREVIEW_WINDOW)
+        .map(|(i, _)| end_byte + i)
+        .unwrap_or(content.len());
+
+    let mut snippet = String::new();
+    if start > 0 {
+        snippet.push('…');
+    }
+    snippet.push_str(&content[start..end]);
+    if end < content.len() {
+        snippet.push('…');
+    }
+
+    let snippet = snippet.split_whitespace().collect::<Vec<_>>().join(" ");
+    if snippet.chars().count() > PREVIEW_MAX_LEN {
+        snippet.chars().take(PREVIEW_MAX_LEN).collect()
+    } else {
+        snippet
+    }
+}
+
+/// Trait used so that pure analytics code stays independent of the concrete
+/// `PricingProvider` type. The HTTP layer adapts the real provider into this.
+pub trait PricingLookup {
+    fn input_output(&self, model: &str) -> Option<(f64, f64)>;
+}
+
+#[derive(Debug, Serialize)]
+pub struct ProjectCount {
+    pub project: Option<String>,
+    pub count: usize,
+}
+
+/// Build per-project session counts across the full dataset, sorted
+/// descending by count. Sessions with `project: None` collapse into one
+/// entry with `project: None` in the response.
+pub fn project_counts(sessions: &[Session]) -> Vec<ProjectCount> {
+    use std::collections::HashMap;
+    let mut counts: HashMap<Option<String>, usize> = HashMap::new();
+    for s in sessions {
+        *counts.entry(s.project.clone()).or_insert(0) += 1;
+    }
+    let mut rows: Vec<ProjectCount> = counts
+        .into_iter()
+        .map(|(project, count)| ProjectCount { project, count })
+        .collect();
+    rows.sort_by(|a, b| b.count.cmp(&a.count));
+    rows
+}
+
+pub fn estimated_cost_usd(session: &Session, pricing: &dyn PricingLookup) -> f64 {
+    let mut total = 0.0;
+    for m in &session.messages {
+        let model = match m.model.as_deref().or(session.model.as_deref()) {
+            Some(m) => m,
+            None => continue,
+        };
+        let Some((in_rate, out_rate)) = pricing.input_output(model) else {
+            continue;
+        };
+        let tokens = match &m.tokens {
+            Some(t) => t,
+            None => continue,
+        };
+        total += (tokens.input.unwrap_or(0) as f64) * in_rate;
+        total += (tokens.output.unwrap_or(0) as f64) * out_rate;
+    }
+    total
+}
