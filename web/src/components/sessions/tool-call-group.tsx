@@ -21,7 +21,11 @@ export function ToolCallGroup({
     <div>
       <button
         type="button"
-        onClick={() => setLocalOpen((v) => !v)}
+        onClick={() => {
+          if (!forceOpen) {
+            setLocalOpen((v) => !v);
+          }
+        }}
         className="flex w-full items-center gap-1.5 rounded border border-slate-200 bg-white px-2 py-1 text-left text-[12px] font-medium text-slate-600 hover:bg-slate-50"
       >
         <ChevronRight
